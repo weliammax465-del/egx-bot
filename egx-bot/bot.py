@@ -1,11 +1,12 @@
 """
 bot.py
 ------
-Telegram bot entry point.
+Telegram bot entry point — Professional EGX Technical Analysis.
 
 Commands:
   /start   — welcome message
-  /report  — fetch and send today's EGX market report on demand
+  /report  — full technical analysis report (all stocks)
+  /scan    — quick scan of top bullish/bearish stocks
 
 Environment variables required:
   TELEGRAM_BOT_TOKEN  — from @BotFather
@@ -29,7 +30,12 @@ from telegram.ext import Application, CommandHandler, ContextTypes
 from telegram.constants import ParseMode
 
 from fetch_egx import build_market_summary, format_summary_text
-from ai_report import generate_arabic_report, build_telegram_message
+from stock_scanner import scan_all_stocks, format_analysis_for_ai
+from ai_report import (
+    generate_arabic_report,
+    build_telegram_message,
+    build_stocks_table_message,
+)
 
 logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
@@ -62,35 +68,88 @@ def _is_egx_trading_day() -> bool:
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
-        "🇪🇬 *مرحبًا بك في بوت البورصة المصرية\\!*\n\n"
-        "يمكنك استخدام الأوامر التالية:\n"
-        "• /report — تقرير السوق اليومي\n\n"
+        "🇪🇬 *مرحبًا بك في بوت التحليل التقني للبورصة المصرية!*\n\n"
+        "الأوامر المتاحة:\n"
+        "• /report — تقرير تحليلي كامل لكل الأسهم\n"
+        "• /scan — مسح سريع لأقوى الأسهم صعودًا وهبوطًا\n\n"
         "⚠️ _المعلومات للأغراض المعلوماتية فقط\\._",
-        parse_mode=ParseMode.MARKDOWN_V2,
+        parse_mode=ParseMode.MARKDOWN,
     )
 
 
 async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Fetch market data, generate AI summary, send formatted report."""
-    msg = await update.message.reply_text("⏳ جاري تحضير التقرير…")
+    """Full professional technical analysis report."""
+    msg = await update.message.reply_text(
+        "⏳ جاري تحليل جميع أسهم البورصة المصرية…\n"
+        "📊 يتم حساب: RSI، Stochastic، MACD، Bollinger، Volume Profile، والمزيد…"
+    )
 
     try:
+        # Fetch EGX 30 index data
         market_summary = build_market_summary()
-        raw_text = format_summary_text(market_summary)
-        arabic_report = generate_arabic_report(raw_text)
-        full_message = build_telegram_message(arabic_report, market_summary)
 
+        # Scan all stocks
+        stocks = scan_all_stocks()
+
+        if not stocks:
+            await msg.edit_text(
+                "⚠️ تعذّر جلب بيانات الأسهم. قد تكون البورصة مغلقة أو المصدر غير متاح."
+            )
+            return
+
+        # Generate AI report
+        analysis_text = format_analysis_for_ai(stocks)
+        ai_report = generate_arabic_report(analysis_text)
+
+        # Build and send main message
+        main_message = build_telegram_message(ai_report, stocks, market_summary)
         await msg.delete()
         await update.message.reply_text(
-            full_message,
+            main_message,
             parse_mode=ParseMode.MARKDOWN,
         )
+
+        # Send detailed stocks table as second message
+        stocks_table = build_stocks_table_message(stocks)
+        if stocks_table and len(stocks_table) > 50:
+            await update.message.reply_text(
+                stocks_table,
+                parse_mode=ParseMode.MARKDOWN,
+            )
+
     except Exception as e:
-        logger.error(f"Error in /report: {e}")
-        # Don't use msg.edit_text — msg might be deleted already
+        logger.error(f"Error in /report: {e}", exc_info=True)
         try:
             await update.message.reply_text(
-                "❌ حدث خطأ أثناء تحضير التقرير. يرجى المحاولة لاحقًا."
+                "❌ حدث خطأ أثناء تحليل الأسهم. يرجى المحاولة لاحقًا."
+            )
+        except Exception:
+            pass
+
+
+async def cmd_scan(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Quick scan — just the top bullish/bearish stocks without AI summary."""
+    msg = await update.message.reply_text("⏳ جاري مسح الأسهم…")
+
+    try:
+        stocks = scan_all_stocks()
+
+        if not stocks:
+            await msg.edit_text("⚠️ تعذّر جلب بيانات الأسهم.")
+            return
+
+        stocks_table = build_stocks_table_message(stocks)
+        await msg.delete()
+        await update.message.reply_text(
+            stocks_table,
+            parse_mode=ParseMode.MARKDOWN,
+        )
+
+    except Exception as e:
+        logger.error(f"Error in /scan: {e}", exc_info=True)
+        try:
+            await update.message.reply_text(
+                "❌ حدث خطأ أثناء المسح. يرجى المحاولة لاحقًا."
             )
         except Exception:
             pass
@@ -100,8 +159,9 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 async def send_scheduled_report() -> None:
     """
-    Push daily report to TELEGRAM_CHAT_ID.
+    Push daily professional technical analysis report to TELEGRAM_CHAT_ID.
     Called directly (not via polling) from GitHub Actions with --scheduled flag.
+    Sends two messages: main report + detailed stocks table.
     """
     token = os.environ["TELEGRAM_BOT_TOKEN"]
     chat_id = os.environ.get("TELEGRAM_CHAT_ID")
@@ -118,34 +178,59 @@ async def send_scheduled_report() -> None:
         return
 
     try:
-        market_summary = build_market_summary()
-
-        # If market data is unavailable, notify but don't crash
-        if not market_summary.is_trading_day:
-            await bot.send_message(
-                chat_id=chat_id,
-                text="ℹ️ تعذّر جلب بيانات السوق اليوم. قد تكون البورصة مغلقة أو المصدر غير متاح.",
-            )
-            logger.info("Market data unavailable. Sent notification and exiting.")
-            return
-
-        raw_text = format_summary_text(market_summary)
-        arabic_report = generate_arabic_report(raw_text)
-        full_message = build_telegram_message(arabic_report, market_summary)
-
+        # Send "generating" notification
         await bot.send_message(
             chat_id=chat_id,
-            text=full_message,
+            text=(
+                "⏳ جاري تحضير التقرير التقني الاحترافي…\n"
+                "📊 يتم تحليل جميع أسهم البورصة المصرية\n"
+                "🔬 حساب: RSI، Stochastic، MACD، Bollinger، Volume Profile، ADX، OBV، Williams %R"
+            ),
+        )
+
+        # Fetch EGX 30 index data
+        market_summary = build_market_summary()
+
+        # Scan all stocks
+        stocks = scan_all_stocks()
+
+        if not stocks:
+            await bot.send_message(
+                chat_id=chat_id,
+                text="⚠️ تعذّر جلب بيانات الأسهم اليوم. قد تكون البورصة مغلقة أو المصدر غير متاح.",
+            )
+            logger.info("No stock data available. Sent notification and exiting.")
+            return
+
+        # Generate AI report
+        analysis_text = format_analysis_for_ai(stocks)
+        ai_report = generate_arabic_report(analysis_text)
+
+        # Build and send main message
+        main_message = build_telegram_message(ai_report, stocks, market_summary)
+        await bot.send_message(
+            chat_id=chat_id,
+            text=main_message,
             parse_mode=ParseMode.MARKDOWN,
         )
-        logger.info("Scheduled report sent successfully.")
+
+        # Send detailed stocks table as second message
+        stocks_table = build_stocks_table_message(stocks)
+        if stocks_table and len(stocks_table) > 50:
+            await bot.send_message(
+                chat_id=chat_id,
+                text=stocks_table,
+                parse_mode=ParseMode.MARKDOWN,
+            )
+
+        logger.info("Scheduled professional report sent successfully.")
 
     except Exception as e:
-        logger.error(f"Failed to send scheduled report: {e}")
+        logger.error(f"Failed to send scheduled report: {e}", exc_info=True)
         try:
             await bot.send_message(
                 chat_id=chat_id,
-                text="❌ تعذّر إرسال تقرير البورصة اليوم. يرجى التحقق من السجلات.",
+                text="❌ تعذّر إرسال التقرير التقني اليوم. يرجى التحقق من السجلات.",
             )
         except Exception:
             pass
@@ -169,6 +254,7 @@ def main() -> None:
 
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("report", cmd_report))
+    app.add_handler(CommandHandler("scan", cmd_scan))
 
     logger.info("Bot is running. Press Ctrl+C to stop.")
     app.run_polling(allowed_updates=Update.ALL_TYPES)

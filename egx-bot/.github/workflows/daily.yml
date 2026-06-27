@@ -1,10 +1,11 @@
-name: EGX Daily Market Report
+name: EGX Daily Technical Analysis Report
 
 on:
-  # Runs at 10:30 AM Cairo time (UTC+2, year-round — Egypt cancelled DST in 2024)
+  # Runs at 9:00 AM Cairo time (UTC+2, year-round — Egypt cancelled DST in 2024)
+  # 9:00 AM Cairo = 7:00 AM UTC
   # Sunday–Thursday = EGX trading days (cron: 0=Sunday in GitHub Actions)
   schedule:
-    - cron: "30 8 * * 0-4"
+    - cron: "0 7 * * 0-4"
 
   # Allow manual trigger from GitHub Actions UI
   workflow_dispatch:
@@ -14,9 +15,9 @@ permissions:
 
 jobs:
   send-report:
-    name: Fetch & Send EGX Report
+    name: Scan & Send EGX Technical Analysis
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
       - name: Checkout repository
@@ -38,7 +39,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Send daily EGX report
+      - name: Send daily EGX technical analysis report
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}

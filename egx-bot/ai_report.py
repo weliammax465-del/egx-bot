@@ -1,7 +1,7 @@
 """
 ai_report.py
 ------------
-Generates a short Arabic market summary using Google Gemini (free tier).
+Generates professional Arabic market analysis using Google Gemini (free tier).
 Requires GEMINI_API_KEY environment variable.
 
 No financial advice is given. Output is informational only.
@@ -14,6 +14,9 @@ import logging
 from datetime import datetime
 import pytz
 import google.generativeai as genai
+
+from indicators import StockAnalysis
+from stock_scanner import get_top_bullish, get_top_bearish
 
 logger = logging.getLogger(__name__)
 
@@ -32,17 +35,37 @@ ARABIC_MONTHS = {
     "October": "أكتوبر", "November": "نوفمبر", "December": "ديسمبر",
 }
 
-SYSTEM_PROMPT = """أنت محلل مالي مصري متخصص في البورصة المصرية (EGX).
-مهمتك هي تقديم ملخص يومي موجز وواضح باللغة العربية عن حركة السوق.
+# Professional system prompt for advanced technical analysis
+SYSTEM_PROMPT = """أنت محلل مالي تقني محترف متخصص في البورصة المصرية (EGX).
+خبرتك تشمل التحليل التقني المتقدم باستخدام:
+- مؤشر القوة النسبية RSI
+- مؤشر الاستوكاستك Stochastic
+- ماكد MACD
+- بولينجر باند Bollinger Bands
+- المتوسطات المتحركة SMA (20، 50، 200)
+- مؤشر الاتجاه ADX
+- مؤشر التوازن الحجمي OBV
+- ويليامز %R
+- فوليوم بروفايل Volume Profile
+- متوسط المدى الحقيقي ATR
+
+مهمتك:
+1. تحليل البيانات التقنية لأسهم البورصة المصرية
+2. تحديد الأسهم الأكثر احتمالية للصعود بناءً على تقاطع المؤشرات
+3. تقديم تبرير تقني واضح لكل توصية
+4. تحديد مستويات الدعم والمقاومة
 
 القواعد الصارمة:
 - لا تقدم نصائح استثمارية شخصية أبدًا.
-- لا تضمن أرباحًا أو تتوقع مكاسب مستقبلية.
+- لا تضمن أرباحًا أو تتوقع نتائج مؤكدة.
+- استخدم صيغة "الأسهم المرشحة للصعود" بدلاً من "أسهم ستصعد".
 - أذكر دائمًا أن المعلومات للأغراض المعلوماتية فقط.
-- استخدم لغة عربية واضحة وبسيطة.
-- الملخص يجب أن يكون بين 5 إلى 8 جمل فقط.
-- ابدأ بحالة المؤشر الرئيسي EGX 30، ثم الأداء الشهري والسنوي، ثم خاتمة تنبيهية.
-- لا تستخدم رموز Markdown مثل * أو _ أو [ في النص.
+- استخدم لغة عربية واضحة ومهنية.
+- لا تستخدم رموز Markdown مثل * أو _ أو [ في النص العادي.
+- التقرير يجب أن يكون منظمًا ومناسبًا للقراءة على الهاتف.
+- لكل سهم مرشح للصعود: اذكر اسم السهم، السعر الحالي، السبب التقني الرئيسي، ومستوى الدعم/المقاومة.
+- أضف قسمًا للأسهم الهابطة (تحذير).
+- اختم بتنبيه واضح أن هذه ليست نصيحة استثمارية.
 """
 
 # Telegram Markdown special chars that need escaping
@@ -73,7 +96,7 @@ def _format_arabic_date() -> str:
 
 def generate_arabic_report(market_text: str) -> str:
     """
-    Takes raw market data as English text and returns a concise Arabic report.
+    Takes raw market/stock data as text and returns a professional Arabic report.
     Includes retry logic and graceful fallback.
     """
     api_key = os.environ.get("GEMINI_API_KEY")
@@ -100,12 +123,18 @@ def generate_arabic_report(market_text: str) -> str:
     )
 
     user_prompt = f"""
-بناءً على البيانات التالية من البورصة المصرية ليوم اليوم،
-اكتب ملخصًا عربيًا موجزًا لا يزيد عن 8 جمل:
+بناءً على البيانات التقنية التالية لأسهم البورصة المصرية،
+اكتب تقريرًا تحليليًا احترافيًا باللغة العربية:
 
 {market_text}
 
-تذكّر: المعلومات للأغراض المعلوماتية فقط، ولا تمثل نصيحة استثمارية.
+التقرير يجب أن يحتوي على:
+1. مقدمة موجزة عن حالة السوق العامة
+2. قائمة بالأسهم المرشحة للصعود (أعلى 3-5 أسهم) مع التبرير التقني لكل سهم
+3. قائمة بالأسهم المرشحة للهبوط (تحذير) مع السبب
+4. خاتمة بتنبيه أن هذه المعلومات للأغراض المعلوماتية فقط وليست نصيحة استثمارية
+
+اجعل التقرير مختصرًا ومناسبًا للقراءة على الهاتف المحمول.
 """
 
     max_retries = 2
@@ -113,7 +142,7 @@ def generate_arabic_report(market_text: str) -> str:
         try:
             response = model.generate_content(
                 user_prompt,
-                request_options={"timeout": 30},  # 30 second timeout
+                request_options={"timeout": 60},  # 60 second timeout for larger input
             )
             if response.text:
                 return response.text.strip()
@@ -130,103 +159,156 @@ def generate_arabic_report(market_text: str) -> str:
 
     # Fallback — return raw data summary without AI
     logger.warning("All Gemini attempts failed. Returning fallback summary.")
-    return (
-        "⚠️ تعذّر إنشاء الملخص الذكي في الوقت الحالي. "
-        "إليك البيانات الخام:\n\n" + market_text
-    )
+    return "⚠️ تعذّر إنشاء التحليل الذكي في الوقت الحالي.\n\n" + market_text
 
 
-def build_telegram_message(summary_ar: str, market_summary) -> str:
+def build_telegram_message(
+    ai_summary: str,
+    stocks: list[StockAnalysis],
+    market_summary=None,
+) -> str:
     """
-    Assemble the full Telegram-formatted message with header, AI summary,
-    raw index data, performance stats, and disclaimer.
-    Handles Telegram's 4096 character limit.
+    Assemble the full professional Telegram-formatted message with:
+    - Header with date
+    - EGX 30 index overview (if available)
+    - AI-generated professional analysis
+    - Top bullish stocks table
+    - Top bearish stocks table
+    - Technical indicators summary for top picks
+    - Disclaimer
+
+    Handles Telegram's 4096 character limit (splits into multiple messages if needed).
+    Returns the first message; additional messages can be sent separately.
     """
     date_str = _format_arabic_date()
 
-    arrow = (
-        "📈" if market_summary.direction == "up"
-        else ("📉" if market_summary.direction == "down" else "➡️")
-    )
-
+    # Build header
     lines = [
-        "🇪🇬 *تقرير البورصة المصرية اليومي*",
+        "🇪🇬 *تقرير البورصة المصرية التقني الاحترافي*",
         f"📅 {date_str}",
         "",
-        f"*مؤشر EGX 30:* {_escape_markdown(str(market_summary.current_value))} {arrow}",
-        f"*التغيير اليومي:* {_escape_markdown(str(market_summary.change))} "
-        f"({_escape_markdown(str(market_summary.change_pct))})",
     ]
 
-    # Add monthly and yearly performance if available
-    if market_summary.month_change_pct:
-        lines.append(
-            f"*الأداء الشهري:* {_escape_markdown(str(market_summary.month_change_pct))}"
+    # EGX 30 index overview if available
+    if market_summary:
+        arrow = (
+            "📈" if market_summary.direction == "up"
+            else ("📉" if market_summary.direction == "down" else "➡️")
         )
-    if market_summary.year_change_pct:
-        lines.append(
-            f"*الأداء السنوي:* {_escape_markdown(str(market_summary.year_change_pct))}"
-        )
-
-    lines += [
-        "",
-        "─────────────────────",
-        "",
-        "🤖 *ملخص الذكاء الاصطناعي:*",
-        _escape_markdown(summary_ar),
-        "",
-        "─────────────────────",
-    ]
-
-    # Append top gainers if available
-    if market_summary.top_gainers:
-        lines.append("📗 *أعلى الأسهم ارتفاعًا:*")
-        for s in market_summary.top_gainers[:3]:
-            name = _escape_markdown(str(s.get("name", "—")))
-            price = _escape_markdown(str(s.get("price", "—")))
-            pct = _escape_markdown(str(s.get("change_pct", "—")))
-            lines.append(f"• {name}: {price} ({pct})")
+        lines += [
+            f"*مؤشر EGX 30:* {_escape_markdown(str(market_summary.current_value))} {arrow}",
+            f"*التغيير اليومي:* {_escape_markdown(str(market_summary.change))} "
+            f"({_escape_markdown(str(market_summary.change_pct))})",
+        ]
+        if market_summary.month_change_pct:
+            lines.append(f"*الأداء الشهري:* {_escape_markdown(str(market_summary.month_change_pct))}")
+        if market_summary.year_change_pct:
+            lines.append(f"*الأداء السنوي:* {_escape_markdown(str(market_summary.year_change_pct))}")
         lines.append("")
 
-    # Append top losers if available
-    if market_summary.top_losers:
-        lines.append("📕 *أعلى الأسهم انخفاضًا:*")
-        for s in market_summary.top_losers[:3]:
-            name = _escape_markdown(str(s.get("name", "—")))
-            price = _escape_markdown(str(s.get("price", "—")))
-            pct = _escape_markdown(str(s.get("change_pct", "—")))
-            lines.append(f"• {name}: {price} ({pct})")
-        lines.append("")
+    # Stats summary
+    total_stocks = len(stocks)
+    bullish_count = sum(1 for s in stocks if s.composite_score >= 2)
+    bearish_count = sum(1 for s in stocks if s.composite_score <= -2)
+    neutral_count = total_stocks - bullish_count - bearish_count
 
-    # Disclaimer
     lines += [
-        "─────────────────────",
-        "⚠️ _هذا التقرير للأغراض المعلوماتية فقط ولا يمثل نصيحة استثمارية._",
-        "_لا تتخذ قرارات استثمارية بناءً على هذه المعلومات وحدها._",
+        f"📊 *ملخص المسح التقني:* {total_stocks} سهم",
+        f"🟢 صاعدة: {bullish_count} | 🔴 هابطة: {bearish_count} | 🟡 محايدة: {neutral_count}",
         "",
-        "🔗 المصدر: Trading Economics | EGX",
+        "─────────────────────",
+        "",
+        "🤖 *التحليل التقني الاحترافي:*",
+        _escape_markdown(ai_summary),
+        "",
     ]
 
     message = "\n".join(lines)
 
-    # Telegram message limit is 4096 chars
-    if len(message) > 4096:
-        message = message[:4090] + "\n…\n"
-        logger.warning("Telegram message was truncated to fit 4096 char limit.")
+    # Check if we need to split
+    if len(message) > 3800:
+        # Split: send header + AI summary as first message
+        # Stocks tables will be separate messages
+        message = message[:3790] + "\n…\n"
+        logger.info("Message split: header + AI summary (stocks table in separate message)")
 
     return message
 
 
-if __name__ == "__main__":
-    # Quick local test with mock data
-    from fetch_egx import build_market_summary, format_summary_text
+def build_stocks_table_message(stocks: list[StockAnalysis]) -> str:
+    """
+    Build a separate message with detailed stock tables (top bullish + bearish).
+    Uses regular Markdown (not V2) for simpler escaping.
+    Sent as a second message after the main report.
+    """
+    lines = ["📊 *تفاصيل الأسهم المرشحة*", ""]
 
-    summary = build_market_summary()
-    text = format_summary_text(summary)
-    print("=== Raw Market Data ===")
-    print(text)
-    print("\n=== Arabic AI Report ===")
+    top_bull = get_top_bullish(stocks, 5)
+    top_bear = get_top_bearish(stocks, 3)
+
+    if top_bull:
+        lines.append("🟢 *الأسهم المرشحة للصعود:*")
+        lines.append("")
+        for i, s in enumerate(top_bull, 1):
+            ticker_clean = s.ticker.replace(".CA", "")
+            lines.append(f"{i}. *{_escape_markdown(s.name_ar)}* ({_escape_markdown(ticker_clean)})")
+            lines.append(
+                f"   السعر: {_escape_markdown(str(s.current_price))} "
+                f"| التغيير: {_escape_markdown(str(s.daily_change_pct))}%"
+            )
+            lines.append(
+                f"   الإشارة: {_escape_markdown(s.signal_label)} "
+                f"| الثقة: {_escape_markdown(str(s.signal_score_pct))}%"
+            )
+            if s.bullish_reasons:
+                for reason in s.bullish_reasons[:3]:
+                    lines.append(f"   ✅ {_escape_markdown(reason)}")
+            lines.append("")
+
+    if top_bear:
+        lines.append("🔴 *الأسهم المرشحة للهبوط (تحذير):*")
+        lines.append("")
+        for i, s in enumerate(top_bear, 1):
+            ticker_clean = s.ticker.replace(".CA", "")
+            lines.append(f"{i}. *{_escape_markdown(s.name_ar)}* ({_escape_markdown(ticker_clean)})")
+            lines.append(
+                f"   السعر: {_escape_markdown(str(s.current_price))} "
+                f"| الإشارة: {_escape_markdown(s.signal_label)}"
+            )
+            if s.bearish_reasons:
+                for reason in s.bearish_reasons[:2]:
+                    lines.append(f"   ⚠️ {_escape_markdown(reason)}")
+            lines.append("")
+
+    lines += [
+        "─────────────────────",
+        "⚠️ _هذا التقرير للأغراض المعلوماتية فقط ولا يمثل نصيحة استثمارية._",
+        "_المؤشرات التقنية أداة مساعدة وليست ضمانا للنتائج._",
+        "_لا تتخذ قرارات استثمارية بناء على هذه المعلومات وحدها._",
+        "",
+        "🔗 المصادر: Yahoo Finance | Trading Economics",
+    ]
+
+    message = "\n".join(lines)
+
+    if len(message) > 4096:
+        message = message[:4090] + "\n…\n"
+        logger.warning("Stocks table message truncated to fit 4096 char limit.")
+
+    return message
+
+if __name__ == "__main__":
+    # Quick local test
+    from stock_scanner import scan_all_stocks, format_analysis_for_ai
+
+    print("Scanning stocks...")
+    stocks = scan_all_stocks()
+    print(f"\nAnalyzed {len(stocks)} stocks\n")
+
+    for s in stocks[:5]:
+        print(f"  {s.name_ar} ({s.ticker}): {s.signal_label} (score={s.composite_score})")
+
+    print("\n=== AI Report ===")
+    text = format_analysis_for_ai(stocks)
     report = generate_arabic_report(text)
     print(report)
-    print("\n=== Full Telegram Message ===")
-    print(build_telegram_message(report, summary))
