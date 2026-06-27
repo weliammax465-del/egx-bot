@@ -1,14 +1,16 @@
 name: EGX Daily Market Report
 
 on:
-  # Runs at 10:30 AM Cairo time (UTC+2) on Sunday–Thursday (EGX trading days)
-  # Cron uses UTC: 08:30 UTC = 10:30 Cairo (standard time)
-  # Adjust to 07:30 UTC in summer (EET = UTC+3) if needed
+  # Runs at 10:30 AM Cairo time (UTC+2, year-round — Egypt cancelled DST in 2024)
+  # Sunday–Thursday = EGX trading days (cron: 0=Sunday in GitHub Actions)
   schedule:
     - cron: "30 8 * * 0-4"
 
   # Allow manual trigger from GitHub Actions UI
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   send-report:

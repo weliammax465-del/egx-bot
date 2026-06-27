@@ -8,12 +8,29 @@ No financial advice is given. Output is informational only.
 """
 
 import os
+import re
+import time
 import logging
+from datetime import datetime
+import pytz
 import google.generativeai as genai
 
 logger = logging.getLogger(__name__)
 
 GEMINI_MODEL = "gemini-1.5-flash"  # Free tier, fast, supports Arabic
+
+# Arabic day/month names
+ARABIC_DAYS = {
+    "Monday": "الإثنين", "Tuesday": "الثلاثاء", "Wednesday": "الأربعاء",
+    "Thursday": "الخميس", "Friday": "الجمعة", "Saturday": "السبت",
+    "Sunday": "الأحد",
+}
+ARABIC_MONTHS = {
+    "January": "يناير", "February": "فبراير", "March": "مارس",
+    "April": "أبريل", "May": "مايو", "June": "يونيو",
+    "July": "يوليو", "August": "أغسطس", "September": "سبتمبر",
+    "October": "أكتوبر", "November": "نوفمبر", "December": "ديسمبر",
+}
 
 SYSTEM_PROMPT = """أنت محلل مالي مصري متخصص في البورصة المصرية (EGX).
 مهمتك هي تقديم ملخص يومي موجز وواضح باللغة العربية عن حركة السوق.
@@ -25,12 +42,39 @@ SYSTEM_PROMPT = """أنت محلل مالي مصري متخصص في البور�
 - استخدم لغة عربية واضحة وبسيطة.
 - الملخص يجب أن يكون بين 5 إلى 8 جمل فقط.
 - ابدأ بحالة المؤشر الرئيسي EGX 30، ثم أبرز الأسهم، ثم خاتمة تنبيهية.
+- لا تستخدم رموز Markdown مثل * أو _ أو [ في النص.
 """
+
+# Telegram Markdown special chars that need escaping
+MARKDOWN_SPECIAL = re.compile(r"([_*\[\]`(){}~#>!\-])")
+
+
+def _escape_markdown(text: str) -> str:
+    """Escape Markdown special characters for Telegram."""
+    if not text:
+        return text
+    return MARKDOWN_SPECIAL.sub(r"\\\1", text)
+
+
+def _format_arabic_date() -> str:
+    """Return today's date in Arabic (e.g. 'الأحد، 28 يونيو 2026')."""
+    cairo_tz = pytz.timezone("Africa/Cairo")
+    now = datetime.now(cairo_tz)
+    day_en = now.strftime("%A")
+    month_en = now.strftime("%B")
+    day_num = now.day
+    year = now.year
+
+    day_ar = ARABIC_DAYS.get(day_en, day_en)
+    month_ar = ARABIC_MONTHS.get(month_en, month_en)
+
+    return f"{day_ar}، {day_num} {month_ar} {year}"
 
 
 def generate_arabic_report(market_text: str) -> str:
     """
     Takes raw market data as English text and returns a concise Arabic report.
+    Includes retry logic and graceful fallback.
     """
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
@@ -40,13 +84,23 @@ def generate_arabic_report(market_text: str) -> str:
         )
 
     genai.configure(api_key=api_key)
+
+    # Configure safety settings — allow financial discussion
+    safety_settings = {
+        "HARASSMENT": "block_none",
+        "HATE_SPEECH": "block_none",
+        "SEXUALLY_EXPLICIT": "block_none",
+        "DANGEROUS_CONTENT": "block_only_high",
+    }
+
     model = genai.GenerativeModel(
         model_name=GEMINI_MODEL,
         system_instruction=SYSTEM_PROMPT,
+        safety_settings=safety_settings,
     )
 
     user_prompt = f"""
-بناءً على البيانات التالية من البورصة المصرية ليوم اليوم، 
+بناءً على البيانات التالية من البورصة المصرية ليوم اليوم،
 اكتب ملخصًا عربيًا موجزًا لا يزيد عن 8 جمل:
 
 {market_text}
@@ -54,28 +108,41 @@ def generate_arabic_report(market_text: str) -> str:
 تذكّر: المعلومات للأغراض المعلوماتية فقط، ولا تمثل نصيحة استثمارية.
 """
 
-    try:
-        response = model.generate_content(user_prompt)
-        return response.text.strip()
-    except Exception as e:
-        logger.error(f"Gemini API error: {e}")
-        return (
-            "⚠️ تعذّر إنشاء الملخص الذكي في الوقت الحالي. "
-            "يرجى المتابعة مع مزود الخدمة لاحقًا."
-        )
+    max_retries = 2
+    for attempt in range(max_retries + 1):
+        try:
+            response = model.generate_content(
+                user_prompt,
+                request_options={"timeout": 30},  # 30 second timeout
+            )
+            if response.text:
+                return response.text.strip()
+            else:
+                logger.warning("Gemini returned empty response")
+                if attempt < max_retries:
+                    time.sleep(2 ** attempt)
+                    continue
+        except Exception as e:
+            logger.error(f"Gemini API error (attempt {attempt + 1}): {e}")
+            if attempt < max_retries:
+                time.sleep(2 ** attempt)
+                continue
+
+    # Fallback — return raw data summary without AI
+    logger.warning("All Gemini attempts failed. Returning fallback summary.")
+    return (
+        "⚠️ تعذّر إنشاء الملخص الذكي في الوقت الحالي. "
+        "إليك البيانات الخام:\n\n" + market_text
+    )
 
 
 def build_telegram_message(summary_ar: str, market_summary) -> str:
     """
     Assemble the full Telegram-formatted message with header, AI summary,
     raw index data, and disclaimer.
+    Handles Telegram's 4096 character limit.
     """
-    from datetime import datetime
-    import pytz
-
-    cairo_tz = pytz.timezone("Africa/Cairo")
-    now = datetime.now(cairo_tz)
-    date_str = now.strftime("%A، %d %B %Y")  # e.g. Sunday، 28 June 2026
+    date_str = _format_arabic_date()
 
     arrow = (
         "📈" if market_summary.direction == "up"
@@ -83,32 +150,39 @@ def build_telegram_message(summary_ar: str, market_summary) -> str:
     )
 
     lines = [
-        f"🇪🇬 *تقرير البورصة المصرية اليومي*",
+        "🇪🇬 *تقرير البورصة المصرية اليومي*",
         f"📅 {date_str}",
         "",
-        f"*مؤشر EGX 30:* {market_summary.current_value} {arrow}",
-        f"*التغيير:* {market_summary.change} ({market_summary.change_pct})",
+        f"*مؤشر EGX 30:* {_escape_markdown(str(market_summary.current_value))} {arrow}",
+        f"*التغيير:* {_escape_markdown(str(market_summary.change))} "
+        f"({_escape_markdown(str(market_summary.change_pct))})",
         "",
         "─────────────────────",
         "",
         "🤖 *ملخص الذكاء الاصطناعي:*",
-        summary_ar,
+        _escape_markdown(summary_ar),
         "",
         "─────────────────────",
     ]
 
-    # Append top gainers
+    # Append top gainers (escape names to avoid Markdown issues)
     if market_summary.top_gainers:
         lines.append("📗 *أعلى الأسهم ارتفاعًا:*")
         for s in market_summary.top_gainers[:3]:
-            lines.append(f"• {s['name']}: {s['price']} ({s['change_pct']})")
+            name = _escape_markdown(str(s.get("name", "—")))
+            price = _escape_markdown(str(s.get("price", "—")))
+            pct = _escape_markdown(str(s.get("change_pct", "—")))
+            lines.append(f"• {name}: {price} ({pct})")
         lines.append("")
 
     # Append top losers
     if market_summary.top_losers:
         lines.append("📕 *أعلى الأسهم انخفاضًا:*")
         for s in market_summary.top_losers[:3]:
-            lines.append(f"• {s['name']}: {s['price']} ({s['change_pct']})")
+            name = _escape_markdown(str(s.get("name", "—")))
+            price = _escape_markdown(str(s.get("price", "—")))
+            pct = _escape_markdown(str(s.get("change_pct", "—")))
+            lines.append(f"• {name}: {price} ({pct})")
         lines.append("")
 
     # Disclaimer
@@ -117,10 +191,17 @@ def build_telegram_message(summary_ar: str, market_summary) -> str:
         "⚠️ _هذا التقرير للأغراض المعلوماتية فقط ولا يمثل نصيحة استثمارية._",
         "_لا تتخذ قرارات استثمارية بناءً على هذه المعلومات وحدها._",
         "",
-        f"🔗 المصدر: Investing.com | EGX",
+        "🔗 المصدر: Investing.com | EGX",
     ]
 
-    return "\n".join(lines)
+    message = "\n".join(lines)
+
+    # Telegram message limit is 4096 chars
+    if len(message) > 4096:
+        message = message[:4090] + "\n…\n"
+        logger.warning("Telegram message was truncated to fit 4096 char limit.")
+
+    return message
 
 
 if __name__ == "__main__":
