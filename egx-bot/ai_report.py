@@ -59,13 +59,11 @@ SYSTEM_PROMPT = """أنت محلل مالي تقني محترف متخصص في 
 - لا تقدم نصائح استثمارية شخصية أبدًا.
 - لا تضمن أرباحًا أو تتوقع نتائج مؤكدة.
 - استخدم صيغة "الأسهم المرشحة للصعود" بدلاً من "أسهم ستصعد".
-- أذكر دائمًا أن المعلومات للأغراض المعلوماتية فقط.
 - استخدم لغة عربية واضحة ومهنية.
 - لا تستخدم رموز Markdown مثل * أو _ أو [ في النص العادي.
 - التقرير يجب أن يكون منظمًا ومناسبًا للقراءة على الهاتف.
 - لكل سهم مرشح للصعود: اذكر اسم السهم، السعر الحالي، السبب التقني الرئيسي، ومستوى الدعم/المقاومة.
 - أضف قسمًا للأسهم الهابطة (تحذير).
-- اختم بتنبيه واضح أن هذه ليست نصيحة استثمارية.
 """
 
 # Telegram Markdown special chars that need escaping
@@ -132,7 +130,6 @@ def generate_arabic_report(market_text: str) -> str:
 1. مقدمة موجزة عن حالة السوق العامة
 2. قائمة بالأسهم المرشحة للصعود (أعلى 5-10 أسهم) مع التبرير التقني لكل سهم
 3. قائمة بالأسهم المرشحة للهبوط (أعلى 3-5 أسهم، تحذير) مع السبب
-4. خاتمة بتنبيه أن هذه المعلومات للأغراض المعلوماتية فقط وليست نصيحة استثمارية
 
 اجعل التقرير مختصرًا ومناسبًا للقراءة على الهاتف المحمول.
 """
@@ -175,8 +172,7 @@ def build_telegram_message(
     - Top bullish stocks table
     - Top bearish stocks table
     - Technical indicators summary for top picks
-    - Disclaimer
-
+    
     Handles Telegram's 4096 character limit (splits into multiple messages if needed).
     Returns the first message; additional messages can be sent separately.
     """
@@ -282,11 +278,7 @@ def build_stocks_table_message(stocks: list[StockAnalysis]) -> str:
 
     lines += [
         "─────────────────────",
-        "⚠️ _هذا التقرير للأغراض المعلوماتية فقط ولا يمثل نصيحة استثمارية._",
-        "_المؤشرات التقنية أداة مساعدة وليست ضمانا للنتائج._",
-        "_لا تتخذ قرارات استثمارية بناء على هذه المعلومات وحدها._",
-        "",
-        "🔗 المصادر: TradingView | stockanalysis.com | Trading Economics",
+        "🔗 المصادر: TradingView | stockanalysis.com",
     ]
 
     message = "\n".join(lines)

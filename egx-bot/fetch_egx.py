@@ -170,7 +170,7 @@ def build_market_summary() -> MarketSummary:
         month_change_pct=month_pct,
         year_change_pct=year_pct,
         date_str=date_str,
-        source_note="البيانات من Trading Economics – للأغراض المعلوماتية فقط." if has_data
+        source_note="البيانات من Trading Economics." if has_data
                     else "تعذّر جلب البيانات. قد تكون البورصة مغلقة.",
         is_trading_day=has_data,
     )
