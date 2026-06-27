@@ -130,8 +130,8 @@ def generate_arabic_report(market_text: str) -> str:
 
 التقرير يجب أن يحتوي على:
 1. مقدمة موجزة عن حالة السوق العامة
-2. قائمة بالأسهم المرشحة للصعود (أعلى 3-5 أسهم) مع التبرير التقني لكل سهم
-3. قائمة بالأسهم المرشحة للهبوط (تحذير) مع السبب
+2. قائمة بالأسهم المرشحة للصعود (أعلى 5-10 أسهم) مع التبرير التقني لكل سهم
+3. قائمة بالأسهم المرشحة للهبوط (أعلى 3-5 أسهم، تحذير) مع السبب
 4. خاتمة بتنبيه أن هذه المعلومات للأغراض المعلوماتية فقط وليست نصيحة استثمارية
 
 اجعل التقرير مختصرًا ومناسبًا للقراءة على الهاتف المحمول.
@@ -243,8 +243,8 @@ def build_stocks_table_message(stocks: list[StockAnalysis]) -> str:
     """
     lines = ["📊 *تفاصيل الأسهم المرشحة*", ""]
 
-    top_bull = get_top_bullish(stocks, 5)
-    top_bear = get_top_bearish(stocks, 3)
+    top_bull = get_top_bullish(stocks, 10)
+    top_bear = get_top_bearish(stocks, 5)
 
     if top_bull:
         lines.append("🟢 *الأسهم المرشحة للصعود:*")
@@ -286,7 +286,7 @@ def build_stocks_table_message(stocks: list[StockAnalysis]) -> str:
         "_المؤشرات التقنية أداة مساعدة وليست ضمانا للنتائج._",
         "_لا تتخذ قرارات استثمارية بناء على هذه المعلومات وحدها._",
         "",
-        "🔗 المصادر: Yahoo Finance | Trading Economics",
+        "🔗 المصادر: TradingView | stockanalysis.com | Trading Economics",
     ]
 
     message = "\n".join(lines)

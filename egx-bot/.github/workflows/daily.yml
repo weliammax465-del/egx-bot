@@ -15,9 +15,9 @@ permissions:
 
 jobs:
   send-report:
-    name: Scan & Send EGX Technical Analysis
+    name: Scan All EGX Stocks & Send Technical Analysis
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
 
     steps:
       - name: Checkout repository
@@ -39,7 +39,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Send daily EGX technical analysis report
+      - name: Scan all EGX stocks and send technical analysis report
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}

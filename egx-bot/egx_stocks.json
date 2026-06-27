@@ -1,0 +1,1346 @@
+[
+  {
+    "symbol": "COMI",
+    "name": "Commercial International Bank Egypt (CIB) S.A.E.",
+    "price": 132.5,
+    "change_pct": 0.3
+  },
+  {
+    "symbol": "TMGH",
+    "name": "Talaat Moustafa Group Holding",
+    "price": 95.86,
+    "change_pct": 0.75
+  },
+  {
+    "symbol": "SWDY",
+    "name": "El Sewedy Electric Company",
+    "price": 86.96,
+    "change_pct": -0.47
+  },
+  {
+    "symbol": "ETEL",
+    "name": "Telecom Egypt Company",
+    "price": 93.65,
+    "change_pct": -1.07
+  },
+  {
+    "symbol": "EGAL",
+    "name": "Egypt Aluminum",
+    "price": 281.82,
+    "change_pct": -0.37
+  },
+  {
+    "symbol": "EAST",
+    "name": "Eastern Company S.A.E",
+    "price": 38.5,
+    "change_pct": 0.18
+  },
+  {
+    "symbol": "QNBE",
+    "name": "Qatar National Bank",
+    "price": 53.18,
+    "change_pct": -1.08
+  },
+  {
+    "symbol": "MFPC",
+    "name": "Misr Fertilizer Production Company",
+    "price": 35.5,
+    "change_pct": -1.8
+  },
+  {
+    "symbol": "ABUK",
+    "name": "Abu Qir Fertilizers & Chemical Industries Company (S.A.E)",
+    "price": 69.05,
+    "change_pct": -1.15
+  },
+  {
+    "symbol": "HDBK",
+    "name": "Housing and Development Bank- Egypt (S.A.E)",
+    "price": 161.92,
+    "change_pct": -1.27
+  },
+  {
+    "symbol": "ALCN",
+    "name": "Alexandria Container&Cargo Handling Company",
+    "price": 27.97,
+    "change_pct": -0.39
+  },
+  {
+    "symbol": "ORAS",
+    "name": "Orascom Construction PLC",
+    "price": 734.0,
+    "change_pct": -6.99
+  },
+  {
+    "symbol": "EFIH",
+    "name": "e-finance for Digital and Financial Investments S.A.E.",
+    "price": 20.78,
+    "change_pct": -0.2
+  },
+  {
+    "symbol": "ADIB",
+    "name": "Abu Dhabi Islamic Bank - Egypt - S.A.E",
+    "price": 44.65,
+    "change_pct": -1.87
+  },
+  {
+    "symbol": "EMFD",
+    "name": "Emaar Misr for Development Company (S.A.E.)",
+    "price": 11.84,
+    "change_pct": 1.02
+  },
+  {
+    "symbol": "FWRY",
+    "name": "Fawry for Banking Technology and Electronic Payments S.A.E.",
+    "price": 18.7,
+    "change_pct": -1.58
+  },
+  {
+    "symbol": "SCTS",
+    "name": "Suez Canal Company for Technology Settling (S.A.E)",
+    "price": 575.73,
+    "change_pct": -0.29
+  },
+  {
+    "symbol": "ORHD",
+    "name": "Orascom Development Egypt S.A.E.",
+    "price": 38.82,
+    "change_pct": -1.22
+  },
+  {
+    "symbol": "PHDC",
+    "name": "Palm Hills Developments S.A.E.",
+    "price": 15.13,
+    "change_pct": -1.43
+  },
+  {
+    "symbol": "GPPL",
+    "name": "Golden Pyramids Plaza S.A.E.",
+    "price": 1.4,
+    "change_pct": 0.0
+  },
+  {
+    "symbol": "VLMR",
+    "name": "Valmore Holding S.A.E.",
+    "price": 0.667,
+    "change_pct": -0.15
+  },
+  {
+    "symbol": "VLMRA",
+    "name": "Valmore Holding S.A.E.",
+    "price": 28.55,
+    "change_pct": -0.73
+  },
+  {
+    "symbol": "HRHO",
+    "name": "EFG Holding Company S.A.E",
+    "price": 26.86,
+    "change_pct": -0.12
+  },
+  {
+    "symbol": "EFID",
+    "name": "Edita Food Industries Company (S.A.E)",
+    "price": 26.8,
+    "change_pct": -2.76
+  },
+  {
+    "symbol": "JUFO",
+    "name": "Juhayna Food Industries S.A.E.",
+    "price": 30.46,
+    "change_pct": -1.33
+  },
+  {
+    "symbol": "CANA",
+    "name": "Suez Canal Bank (S.A.E)",
+    "price": 35.41,
+    "change_pct": -2.18
+  },
+  {
+    "symbol": "GBCO",
+    "name": "GB Corp",
+    "price": 31.5,
+    "change_pct": 0.1
+  },
+  {
+    "symbol": "OCDI",
+    "name": "Sixth of October for Development and Investment Company \"SODIC\" (S.A.E.)",
+    "price": 25.39,
+    "change_pct": 4.79
+  },
+  {
+    "symbol": "BTFH",
+    "name": "Beltone Holding S.A.E",
+    "price": 3.03,
+    "change_pct": 0.33
+  },
+  {
+    "symbol": "RAYA",
+    "name": "Raya Holding Company for Financial Investments (S.A.E)",
+    "price": 7.4,
+    "change_pct": 0.0
+  },
+  {
+    "symbol": "IRON",
+    "name": "Egyptian Iron and Steel Company",
+    "price": 31.31,
+    "change_pct": -1.17
+  },
+  {
+    "symbol": "FERC",
+    "name": "Ferchem Misr for fertilizers and chemicals S.A.E",
+    "price": 75.24,
+    "change_pct": -0.38
+  },
+  {
+    "symbol": "CIEB",
+    "name": "Credit Agricole - Egypt Bank (S.A.E.)",
+    "price": 23.93,
+    "change_pct": -0.33
+  },
+  {
+    "symbol": "FAIT",
+    "name": "Faisal Islamic Bank of Egypt",
+    "price": 36.15,
+    "change_pct": -0.25
+  },
+  {
+    "symbol": "FAITA",
+    "name": "Faisal Islamic Bank of Egypt",
+    "price": 0.99,
+    "change_pct": 0.0
+  },
+  {
+    "symbol": "HELI",
+    "name": "Heliopolis Co. for Housing & Development",
+    "price": 6.53,
+    "change_pct": -0.46
+  },
+  {
+    "symbol": "EGCH",
+    "name": "Egyptian Chemical Industries",
+    "price": 12.86,
+    "change_pct": -1.83
+  },
+  {
+    "symbol": "VALU",
+    "name": "U Consumer Finance S.A.E.",
+    "price": 11.9,
+    "change_pct": -2.38
+  },
+  {
+    "symbol": "EXPA",
+    "name": "Export Development Bank of Egypt (S.A.E.)",
+    "price": 18.4,
+    "change_pct": 0.99
+  },
+  {
+    "symbol": "CLHO",
+    "name": "Cleopatra Hospitals Group S.A.E.",
+    "price": 16.8,
+    "change_pct": -1.18
+  },
+  {
+    "symbol": "ARCC",
+    "name": "Arabian Cement Company S.A.E.",
+    "price": 55.44,
+    "change_pct": -1.18
+  },
+  {
+    "symbol": "CCAP",
+    "name": "QALA For Financial Investments",
+    "price": 4.88,
+    "change_pct": -2.98
+  },
+  {
+    "symbol": "TAQA",
+    "name": "TAQA Arabia S.A.E.",
+    "price": 14.81,
+    "change_pct": -0.2
+  },
+  {
+    "symbol": "EFIC",
+    "name": "Egyptian Financial and Industrial SAE",
+    "price": 195.08,
+    "change_pct": -1.55
+  },
+  {
+    "symbol": "POUL",
+    "name": "Cairo Poultry Company S.A.E.",
+    "price": 38.6,
+    "change_pct": -2.72
+  },
+  {
+    "symbol": "SKPC",
+    "name": "Sidi Kerir Petrochemicals Co.",
+    "price": 15.9,
+    "change_pct": -1.3
+  },
+  {
+    "symbol": "EGTS",
+    "name": "Egyptian Resorts Company (S.A.E)",
+    "price": 17.06,
+    "change_pct": -1.95
+  },
+  {
+    "symbol": "MTIE",
+    "name": "MM Group for Industry and International Trade S.A.E.",
+    "price": 9.04,
+    "change_pct": 0.56
+  },
+  {
+    "symbol": "CIRA",
+    "name": "Cairo For Investment And Real Estate Developments-CIRA Education",
+    "price": 28.03,
+    "change_pct": -2.44
+  },
+  {
+    "symbol": "SCEM",
+    "name": "Sinai Cement Co. (S.A.E)",
+    "price": 62.56,
+    "change_pct": -1.23
+  },
+  {
+    "symbol": "EGSA",
+    "name": "The Egyptian Satellite Company Nilesat",
+    "price": 8.75,
+    "change_pct": -0.34
+  },
+  {
+    "symbol": "MCQE",
+    "name": "Misr Cement (Qena) Company (S.A.E)",
+    "price": 167.34,
+    "change_pct": -2.65
+  },
+  {
+    "symbol": "SAUD",
+    "name": "alBaraka Bank Egypt S.A.E.",
+    "price": 21.1,
+    "change_pct": 0.33
+  },
+  {
+    "symbol": "ORWE",
+    "name": "Oriental Weavers Carpets Company (S.A.E)",
+    "price": 22.84,
+    "change_pct": -0.48
+  },
+  {
+    "symbol": "MASR",
+    "name": "Madinet Masr For Housing and Development",
+    "price": 7.01,
+    "change_pct": -1.27
+  },
+  {
+    "symbol": "PHAR",
+    "name": "Egyptian International Pharmaceutical Industries Company",
+    "price": 88.5,
+    "change_pct": 0.02
+  },
+  {
+    "symbol": "UBEE",
+    "name": "The United Bank",
+    "price": 13.4,
+    "change_pct": -0.22
+  },
+  {
+    "symbol": "MHOT",
+    "name": "Misr Hotels Company",
+    "price": 34.89,
+    "change_pct": -0.31
+  },
+  {
+    "symbol": "MBSC",
+    "name": "Misr Beni Suef Cement Co. S.A.E",
+    "price": 242.74,
+    "change_pct": -0.31
+  },
+  {
+    "symbol": "ISPH",
+    "name": "Ibnsina Pharma",
+    "price": 12.05,
+    "change_pct": -1.23
+  },
+  {
+    "symbol": "CICH",
+    "name": "CI Capital Holding For Financial Investments (S.A.E)",
+    "price": 12.12,
+    "change_pct": 0.08
+  },
+  {
+    "symbol": "EGBE",
+    "name": "Egyptian Gulf Bank (S.A.E)",
+    "price": 0.459,
+    "change_pct": 3.38
+  },
+  {
+    "symbol": "TALM",
+    "name": "Taaleem Management Services Company S.A.E.",
+    "price": 15.89,
+    "change_pct": -0.44
+  },
+  {
+    "symbol": "ATQA",
+    "name": "Misr National Steel - Ataqa",
+    "price": 9.47,
+    "change_pct": 0.75
+  },
+  {
+    "symbol": "MOIL",
+    "name": "Maridive and Oil Services S.A.E.",
+    "price": 0.483,
+    "change_pct": -0.41
+  },
+  {
+    "symbol": "BINV",
+    "name": "B Investments Holding S.A.E.",
+    "price": 48.0,
+    "change_pct": 1.33
+  },
+  {
+    "symbol": "RMDA",
+    "name": "Tenth of Ramadan for Pharmaceutical Industries and Diagnostic Reagents (Rameda) (S.A.E)",
+    "price": 4.94,
+    "change_pct": -1.2
+  },
+  {
+    "symbol": "AMOC",
+    "name": "Alexandria Mineral Oils Company",
+    "price": 7.6,
+    "change_pct": -0.91
+  },
+  {
+    "symbol": "IFAP",
+    "name": "International Company for Agricultural Crops",
+    "price": 19.38,
+    "change_pct": 0.89
+  },
+  {
+    "symbol": "CSAG",
+    "name": "Canal Shipping Agencies Company",
+    "price": 31.8,
+    "change_pct": 1.66
+  },
+  {
+    "symbol": "OLFI",
+    "name": "Obour Land for Food Industries S.A.E.",
+    "price": 21.67,
+    "change_pct": -0.69
+  },
+  {
+    "symbol": "ISMQ",
+    "name": "Iron & Steel for Mines & Quarries",
+    "price": 8.66,
+    "change_pct": -2.81
+  },
+  {
+    "symbol": "BONY",
+    "name": "Bonyan for Development and Trade",
+    "price": 4.92,
+    "change_pct": -0.61
+  },
+  {
+    "symbol": "NIPH",
+    "name": "EI- Nile Co. for Pharmaceuticals and Chemical Industries",
+    "price": 162.0,
+    "change_pct": -1.24
+  },
+  {
+    "symbol": "SPHT",
+    "name": "El Shams Pyramids Co. For Hotels & Touristic Projects S.A.E",
+    "price": 1.91,
+    "change_pct": 0.0
+  },
+  {
+    "symbol": "DOMT",
+    "name": "Arabian Food Industries Company (DOMTY) - S.A.E",
+    "price": 26.91,
+    "change_pct": -1.65
+  },
+  {
+    "symbol": "MIPH",
+    "name": "MINAPHARM Pharmaceuticals",
+    "price": 641.55,
+    "change_pct": -3.24
+  },
+  {
+    "symbol": "KORA",
+    "name": "Korra for Energy and Investment Projects (S.A.E.)",
+    "price": 3.34,
+    "change_pct": 0.6
+  },
+  {
+    "symbol": "OIH",
+    "name": "Orascom Investment Holding S.A.E.",
+    "price": 1.41,
+    "change_pct": 0.71
+  },
+  {
+    "symbol": "PRDC",
+    "name": "Pioneers Properties For Urban Development - PRE Group",
+    "price": 7.06,
+    "change_pct": -1.4
+  },
+  {
+    "symbol": "MPRC",
+    "name": "Egyptian Media Production City",
+    "price": 38.41,
+    "change_pct": 3.25
+  },
+  {
+    "symbol": "EGAS",
+    "name": "Egypt Gas Company SAE",
+    "price": 49.14,
+    "change_pct": -5.48
+  },
+  {
+    "symbol": "ELEC",
+    "name": "Electro Cable Egypt",
+    "price": 2.1,
+    "change_pct": -1.41
+  },
+  {
+    "symbol": "SUGR",
+    "name": "Delta Sugar Company",
+    "price": 47.05,
+    "change_pct": -0.55
+  },
+  {
+    "symbol": "ZMID",
+    "name": "Zahraa El Maadi Investment and Development Company SAE",
+    "price": 6.45,
+    "change_pct": -1.68
+  },
+  {
+    "symbol": "ACAP",
+    "name": "A Capital Holding",
+    "price": 8.65,
+    "change_pct": -2.15
+  },
+  {
+    "symbol": "AMES",
+    "name": "Alexandria New Medical Center",
+    "price": 48.2,
+    "change_pct": -0.41
+  },
+  {
+    "symbol": "MOIN",
+    "name": "Mohandes Insurance Company",
+    "price": 23.03,
+    "change_pct": -2.04
+  },
+  {
+    "symbol": "BIOC",
+    "name": "GlaxoSmithKline S.A.E",
+    "price": 71.44,
+    "change_pct": 0.59
+  },
+  {
+    "symbol": "PHTV",
+    "name": "Pyramisa Hotels & Resorts",
+    "price": 249.99,
+    "change_pct": -0.7
+  },
+  {
+    "symbol": "NAPR",
+    "name": "National Printing Company S.A.E.",
+    "price": 26.91,
+    "change_pct": -1.32
+  },
+  {
+    "symbol": "CNFN",
+    "name": "Contact Financial Holding S.A.E.",
+    "price": 4.84,
+    "change_pct": -2.42
+  },
+  {
+    "symbol": "CPCI",
+    "name": "Kahira Pharmaceuticals & Chemical Industries Company",
+    "price": 377.33,
+    "change_pct": 0.49
+  },
+  {
+    "symbol": "AXPH",
+    "name": "Alexandria Co. For Pharmaceuticals & Chemical Industries",
+    "price": 1100.31,
+    "change_pct": 0.01
+  },
+  {
+    "symbol": "NINH",
+    "name": "Nozha International Hospital",
+    "price": 17.99,
+    "change_pct": -0.22
+  },
+  {
+    "symbol": "MPCI",
+    "name": "Memphis Pharmaceuticals & Chemical Industries",
+    "price": 236.17,
+    "change_pct": -2.53
+  },
+  {
+    "symbol": "ENGC",
+    "name": "Industrial Engineering Company for Construction and Development (ICON) (S.A.E)",
+    "price": 35.61,
+    "change_pct": -1.9
+  },
+  {
+    "symbol": "GOUR",
+    "name": "Gourmet Egypt.Com Foods",
+    "price": 12.82,
+    "change_pct": -1.16
+  },
+  {
+    "symbol": "SPIN",
+    "name": "Alexandria Spinning & Weaving Co.",
+    "price": 13.99,
+    "change_pct": 1.23
+  },
+  {
+    "symbol": "DSCW",
+    "name": "Dice For Ready-Made Garments (SAE)",
+    "price": 1.76,
+    "change_pct": -1.12
+  },
+  {
+    "symbol": "MFSC",
+    "name": "Egypt Free Shops Co.",
+    "price": 49.96,
+    "change_pct": 0.44
+  },
+  {
+    "symbol": "SVCE",
+    "name": "South Valley Cement Company",
+    "price": 9.3,
+    "change_pct": -1.27
+  },
+  {
+    "symbol": "AMIA",
+    "name": "Arab Moltaqa Investments Company",
+    "price": 8.67,
+    "change_pct": 1.17
+  },
+  {
+    "symbol": "GSSC",
+    "name": "General Co. For Silos & Storage",
+    "price": 245.91,
+    "change_pct": -0.9
+  },
+  {
+    "symbol": "GDWA",
+    "name": "Gadwa for Industrial Development",
+    "price": 0.776,
+    "change_pct": -1.15
+  },
+  {
+    "symbol": "OCPH",
+    "name": "October Pharma S.A.E",
+    "price": 345.35,
+    "change_pct": 0.9
+  },
+  {
+    "symbol": "MICH",
+    "name": "Misr Chemical Industries Co.",
+    "price": 37.5,
+    "change_pct": -1.83
+  },
+  {
+    "symbol": "WCDF",
+    "name": "Middle & West Delta Flour Mills",
+    "price": 531.95,
+    "change_pct": 0.0
+  },
+  {
+    "symbol": "AJWA",
+    "name": "AJWA For Food Industries Co. Egypt",
+    "price": 176.53,
+    "change_pct": -0.22
+  },
+  {
+    "symbol": "KABO",
+    "name": "El-Nasr Clothing & Textiles Co. (KABO)",
+    "price": 6.19,
+    "change_pct": 0.16
+  },
+  {
+    "symbol": "SAIB",
+    "name": "Soci\u00c3\u00a9t\u00c3\u00a9 Arabe Internationale de Banque S.A.E",
+    "price": 2.11,
+    "change_pct": 0.0
+  },
+  {
+    "symbol": "UEFM",
+    "name": "Upper Egypt Mills Company J.S.C",
+    "price": 486.78,
+    "change_pct": -1.96
+  },
+  {
+    "symbol": "ACTF.CA",
+    "name": "Act Financial",
+    "price": 2.68,
+    "change_pct": -0.37
+  },
+  {
+    "symbol": "UNIT",
+    "name": "United Co. for Housing & Development - S.A.E.",
+    "price": 12.96,
+    "change_pct": -0.99
+  },
+  {
+    "symbol": "ASCM",
+    "name": "ASEC Company for Mining ASCOM, S.A.E",
+    "price": 60.31,
+    "change_pct": -2.25
+  },
+  {
+    "symbol": "ADCI",
+    "name": "The Arab Drug Company",
+    "price": 238.94,
+    "change_pct": -1.67
+  },
+  {
+    "symbol": "ARAB",
+    "name": "Arab Developers Holding",
+    "price": 0.204,
+    "change_pct": -1.45
+  },
+  {
+    "symbol": "OFH",
+    "name": "O B Financial Holding S.A.E",
+    "price": 0.595,
+    "change_pct": -1.16
+  },
+  {
+    "symbol": "ACAMD",
+    "name": "Arab Co.,for asset management and development",
+    "price": 2.2,
+    "change_pct": -1.79
+  },
+  {
+    "symbol": "ISMA",
+    "name": "Ismailia / Misr Poultry Company S.A.E",
+    "price": 29.59,
+    "change_pct": -0.17
+  },
+  {
+    "symbol": "ELSH",
+    "name": "Al Shams Housing and Urbanization SAE",
+    "price": 11.68,
+    "change_pct": -1.6
+  },
+  {
+    "symbol": "ETRS",
+    "name": "Egyptian Transport & Commercial Services Co. -EGYTRANS NOSCO",
+    "price": 11.3,
+    "change_pct": 10.68
+  },
+  {
+    "symbol": "SDTI",
+    "name": "SHARM DREAMS Co. for Touristic Investment S.A.E",
+    "price": 46.97,
+    "change_pct": 0.58
+  },
+  {
+    "symbol": "KZPC",
+    "name": "Kafr El Zayat For Pesticides & Chemicals Co.(S.A.E)",
+    "price": 8.63,
+    "change_pct": -1.93
+  },
+  {
+    "symbol": "ACGC",
+    "name": "Arabia Cotton Ginning Company",
+    "price": 9.41,
+    "change_pct": -2.08
+  },
+  {
+    "symbol": "LCSW",
+    "name": "Lecico Egypt (S.A.E.)",
+    "price": 29.72,
+    "change_pct": 8.75
+  },
+  {
+    "symbol": "CFGH",
+    "name": "Concrete Fashion Group For Commercial and Industrial investments S.A.E",
+    "price": 0.101,
+    "change_pct": 0.0
+  },
+  {
+    "symbol": "ALRA",
+    "name": "Atlas for Investment & Food Industries",
+    "price": 2.03,
+    "change_pct": 1.5
+  },
+  {
+    "symbol": "ELKA",
+    "name": "Cairo for Housing and Development Company (S.A.E)",
+    "price": 1.24,
+    "change_pct": 0.81
+  },
+  {
+    "symbol": "AFMC",
+    "name": "Alexandria Flour Mills",
+    "price": 69.72,
+    "change_pct": -1.19
+  },
+  {
+    "symbol": "ZEOT",
+    "name": "Extracted Oil & Derivatives Co.",
+    "price": 10.9,
+    "change_pct": -4.8
+  },
+  {
+    "symbol": "AMER",
+    "name": "Amer Group Holding Company S.A.E.",
+    "price": 2.39,
+    "change_pct": -1.24
+  },
+  {
+    "symbol": "ATLC",
+    "name": "Al Tawfeek Leasing Company",
+    "price": 5.25,
+    "change_pct": 2.94
+  },
+  {
+    "symbol": "PHGC",
+    "name": "Premium Healthcare Group",
+    "price": 0.087,
+    "change_pct": -1.14
+  },
+  {
+    "symbol": "SNFC",
+    "name": "Sharkia National Company for Food Security",
+    "price": 12.29,
+    "change_pct": 2.5
+  },
+  {
+    "symbol": "EDFM",
+    "name": "East Delta Flour Mills",
+    "price": 330.59,
+    "change_pct": -0.43
+  },
+  {
+    "symbol": "NAHO",
+    "name": "Naeem Holding Company For Investments (S.A.E - Free Zone)",
+    "price": 0.104,
+    "change_pct": 0.0
+  },
+  {
+    "symbol": "GGRN",
+    "name": "Go Green For Agricultural Investment And Development",
+    "price": 1.39,
+    "change_pct": -3.47
+  },
+  {
+    "symbol": "DAPH",
+    "name": "Development & Engineering Consultants",
+    "price": 82.48,
+    "change_pct": 0.44
+  },
+  {
+    "symbol": "INFI",
+    "name": "Ismailia National Co. for Food Industries",
+    "price": 92.69,
+    "change_pct": -0.58
+  },
+  {
+    "symbol": "SMFR",
+    "name": "Samad Misr EGYFERT.S.A.E",
+    "price": 196.11,
+    "change_pct": -1.57
+  },
+  {
+    "symbol": "RACC",
+    "name": "Raya Customer Experience",
+    "price": 9.8,
+    "change_pct": -0.51
+  },
+  {
+    "symbol": "MPCO",
+    "name": "Mansoura Poultry co.S.A.E",
+    "price": 1.84,
+    "change_pct": -1.6
+  },
+  {
+    "symbol": "EALR",
+    "name": "Arab Company For Land Reclamation",
+    "price": 351.42,
+    "change_pct": -0.93
+  },
+  {
+    "symbol": "ECAP",
+    "name": "Al Ezz Ceramics & Porcelain Co.",
+    "price": 33.79,
+    "change_pct": 3.81
+  },
+  {
+    "symbol": "GPIM",
+    "name": "GPI for Urban Growth",
+    "price": 1.08,
+    "change_pct": -1.82
+  },
+  {
+    "symbol": "NARE",
+    "name": "Naeem Real Estate Holding Group",
+    "price": 13.65,
+    "change_pct": -2.29
+  },
+  {
+    "symbol": "EHDR",
+    "name": "Egyptians for Housing & Development Co.",
+    "price": 2.58,
+    "change_pct": 1.98
+  },
+  {
+    "symbol": "ADPC",
+    "name": "The Arab Dairy Products Co.",
+    "price": 3.46,
+    "change_pct": -4.42
+  },
+  {
+    "symbol": "MENA",
+    "name": "Mena for Touristic & Real Estate Investment",
+    "price": 6.69,
+    "change_pct": -0.3
+  },
+  {
+    "symbol": "IDRE",
+    "name": "Ismailia Development and Real Estate Co",
+    "price": 43.93,
+    "change_pct": -1.33
+  },
+  {
+    "symbol": "WKOL",
+    "name": "Wadi Kom Ombo For Land Reclamation Co.",
+    "price": 284.62,
+    "change_pct": -1.09
+  },
+  {
+    "symbol": "MOSC",
+    "name": "Misr Oils & Soap",
+    "price": 260.65,
+    "change_pct": -2.1
+  },
+  {
+    "symbol": "CRST",
+    "name": "Creast Mark For Contracting And Real Estate Development",
+    "price": 1.37,
+    "change_pct": 2.24
+  },
+  {
+    "symbol": "PRCL",
+    "name": "The General Company for Ceramic and Porcelain Products",
+    "price": 30.5,
+    "change_pct": 3.04
+  },
+  {
+    "symbol": "CEFM",
+    "name": "Middle Egypt Flour Mills",
+    "price": 100.06,
+    "change_pct": -0.8
+  },
+  {
+    "symbol": "MAAL",
+    "name": "Marseille Almasreia Alkhalegeya For Holding Investment SAE",
+    "price": 6.99,
+    "change_pct": 0.58
+  },
+  {
+    "symbol": "DEIN",
+    "name": "Delta Insurance Company",
+    "price": 11.38,
+    "change_pct": 0.0
+  },
+  {
+    "symbol": "SCFM",
+    "name": "South Cairo and Giza Flour Mills and Bakeries Company",
+    "price": 236.72,
+    "change_pct": -3.02
+  },
+  {
+    "symbol": "MILS",
+    "name": "North Cairo Flour Mills",
+    "price": 132.08,
+    "change_pct": -1.09
+  },
+  {
+    "symbol": "OBRI",
+    "name": "El-Ebour Co. for Real Estate Investment S.A.E.",
+    "price": 33.55,
+    "change_pct": -2.44
+  },
+  {
+    "symbol": "CERA",
+    "name": "The Arab Ceramic Co.",
+    "price": 1.24,
+    "change_pct": 0.0
+  },
+  {
+    "symbol": "TYCN",
+    "name": "Tycoon Holding Company For Financial Investments",
+    "price": 25.44,
+    "change_pct": 20.0
+  },
+  {
+    "symbol": "AALR",
+    "name": "General Company For Land Reclamation, Development & Reconstruction",
+    "price": 203.93,
+    "change_pct": -1.06
+  },
+  {
+    "symbol": "NCCW",
+    "name": "Nasr Company for Civil Works",
+    "price": 6.21,
+    "change_pct": -2.21
+  },
+  {
+    "symbol": "ODIN",
+    "name": "ODIN Investments (S.A.E)",
+    "price": 2.1,
+    "change_pct": 0.0
+  },
+  {
+    "symbol": "NDRL",
+    "name": "National Drilling Company",
+    "price": 4.69,
+    "change_pct": 0.0
+  },
+  {
+    "symbol": "MEPA",
+    "name": "Medical Packaging Company",
+    "price": 1.59,
+    "change_pct": -1.24
+  },
+  {
+    "symbol": "NHPS",
+    "name": "National Company for Housing Professional Syndicates SAE",
+    "price": 64.09,
+    "change_pct": 1.42
+  },
+  {
+    "symbol": "UEGC",
+    "name": "El-Saeed Company for Contracting and Real Estate Investment \"SCCD\" (S.A.E.)",
+    "price": 1.39,
+    "change_pct": 0.73
+  },
+  {
+    "symbol": "POCO",
+    "name": "Port Said Containers And Cargo Handling Co.",
+    "price": 5.0,
+    "change_pct": 0.0
+  },
+  {
+    "symbol": "AIDC",
+    "name": "Arabia for Investment and Development S.A.E.",
+    "price": 0.624,
+    "change_pct": -1.89
+  },
+  {
+    "symbol": "COSG",
+    "name": "Cairo Oil & Soap Company",
+    "price": 1.53,
+    "change_pct": 0.0
+  },
+  {
+    "symbol": "GGCC",
+    "name": "Giza General - Contracting and Real Estate Investment S.A.E",
+    "price": 0.437,
+    "change_pct": 2.82
+  },
+  {
+    "symbol": "EBSC",
+    "name": "Osool ESB Securities Brokerage",
+    "price": 1.79,
+    "change_pct": -1.65
+  },
+  {
+    "symbol": "SEIG",
+    "name": "Saudi Egyptian Investment & Finance Co. S.A.E",
+    "price": 185.27,
+    "change_pct": 0.03
+  },
+  {
+    "symbol": "SEIGA",
+    "name": "Saudi Egyptian Investment & Finance Co. S.A.E",
+    "price": 0.95,
+    "change_pct": 0.0
+  },
+  {
+    "symbol": "ALUM",
+    "name": "Arab Aluminum Company (S.A.E)",
+    "price": 21.62,
+    "change_pct": -4.72
+  },
+  {
+    "symbol": "GTWL",
+    "name": "Golden Textiles & Clothes Wool",
+    "price": 63.05,
+    "change_pct": 9.5
+  },
+  {
+    "symbol": "RTVC",
+    "name": "Remco Tourism Villages Construction",
+    "price": 3.63,
+    "change_pct": -4.97
+  },
+  {
+    "symbol": "PRMH",
+    "name": "Prime Holding S.A.E",
+    "price": 2.55,
+    "change_pct": -1.54
+  },
+  {
+    "symbol": "SIPC",
+    "name": "Sabaa International Company for Pharmaceutical and Chemical Industry",
+    "price": 3.44,
+    "change_pct": 0.59
+  },
+  {
+    "symbol": "RREI",
+    "name": "Arab Real Estate Investment Co.",
+    "price": 3.45,
+    "change_pct": -2.54
+  },
+  {
+    "symbol": "ARVA",
+    "name": "Arab Valves Company",
+    "price": 11.29,
+    "change_pct": 0.98
+  },
+  {
+    "symbol": "CAED",
+    "name": "Cairo Educational Services SAE",
+    "price": 70.16,
+    "change_pct": -0.48
+  },
+  {
+    "symbol": "EASB",
+    "name": "Egyptian Arabian Company (Themar) for securities Brokerage EAC",
+    "price": 8.11,
+    "change_pct": 1.38
+  },
+  {
+    "symbol": "ICID",
+    "name": "International Co. For Investment & Development",
+    "price": 8.05,
+    "change_pct": 6.62
+  },
+  {
+    "symbol": "AFDI",
+    "name": "Al Ahly for Development & Investment",
+    "price": 44.41,
+    "change_pct": -4.9
+  },
+  {
+    "symbol": "APSW",
+    "name": "Unirab Polvara Spinning & Weaving Co.",
+    "price": 8.46,
+    "change_pct": -1.17
+  },
+  {
+    "symbol": "MEGM",
+    "name": "Middle East Glass Manufacturing Company S.A.E.",
+    "price": 12.54,
+    "change_pct": 0.0
+  },
+  {
+    "symbol": "GTEX",
+    "name": "GTEX for Commercial and Industrial Investments S.A.E",
+    "price": 0.033,
+    "change_pct": 0.0
+  },
+  {
+    "symbol": "ICLE",
+    "name": "International Company for Leasing S.A.E.",
+    "price": 15.76,
+    "change_pct": 0.0
+  },
+  {
+    "symbol": "LUTS",
+    "name": "Lotus For Agricultural Investments And Development",
+    "price": 0.72,
+    "change_pct": -1.64
+  },
+  {
+    "symbol": "TANM",
+    "name": "Tanmiya For Real Estate Investment (S.A.E)",
+    "price": 5.08,
+    "change_pct": -0.59
+  },
+  {
+    "symbol": "UNIP",
+    "name": "Universal For Paper and Packaging Materials",
+    "price": 0.315,
+    "change_pct": -0.63
+  },
+  {
+    "symbol": "ROTO",
+    "name": "Rowad Tourism Company",
+    "price": 41.14,
+    "change_pct": -0.87
+  },
+  {
+    "symbol": "SPMD",
+    "name": "Speed Medical Co",
+    "price": 0.425,
+    "change_pct": -2.07
+  },
+  {
+    "symbol": "AIHC",
+    "name": "Arabia Investments Holding",
+    "price": 0.448,
+    "change_pct": -1.97
+  },
+  {
+    "symbol": "MCRO",
+    "name": "Macro Group Pharmaceuticals (Macro Capital) S.A.E",
+    "price": 1.22,
+    "change_pct": 0.0
+  },
+  {
+    "symbol": "RAKT",
+    "name": "Rakta Paper Manufacturing Company",
+    "price": 23.11,
+    "change_pct": 0.0
+  },
+  {
+    "symbol": "KRDI",
+    "name": "AlKhair River for Development Agricultural Investment and Environmental Services",
+    "price": 0.342,
+    "change_pct": -0.29
+  },
+  {
+    "symbol": "MOED",
+    "name": "The Egyptian Modern Education Systems, S.A.E.",
+    "price": 0.672,
+    "change_pct": -1.18
+  },
+  {
+    "symbol": "DTPP",
+    "name": "Delta Co. For Printing & Packaging S.A.E",
+    "price": 116.0,
+    "change_pct": -1.11
+  },
+  {
+    "symbol": "RUBX",
+    "name": "Rubex International for Plastic and Acrylic Manufacturing",
+    "price": 10.51,
+    "change_pct": 1.74
+  },
+  {
+    "symbol": "AREH",
+    "name": "Real Estate Egyptian Consortium S.A.E",
+    "price": 1.58,
+    "change_pct": -2.47
+  },
+  {
+    "symbol": "ASPI",
+    "name": "Aspire Capital Holding for Financial Investments",
+    "price": 0.313,
+    "change_pct": -1.57
+  },
+  {
+    "symbol": "KWIN",
+    "name": "El Kahera El Watania Investment",
+    "price": 70.13,
+    "change_pct": 5.92
+  },
+  {
+    "symbol": "EEII",
+    "name": "Arab Engineering Industries",
+    "price": 2.42,
+    "change_pct": 0.83
+  },
+  {
+    "symbol": "CCRS",
+    "name": "Gulf Canadian Company for Arab Real Estate Investment",
+    "price": 2.36,
+    "change_pct": -1.67
+  },
+  {
+    "symbol": "GRCA",
+    "name": "Grand Capital for Financial Investments",
+    "price": 53.16,
+    "change_pct": -0.64
+  },
+  {
+    "symbol": "EPCO",
+    "name": "Egypt for Poultry",
+    "price": 8.9,
+    "change_pct": -1.22
+  },
+  {
+    "symbol": "ELWA",
+    "name": "El Wadi for International and Investment Development SAE",
+    "price": 2.04,
+    "change_pct": 1.49
+  },
+  {
+    "symbol": "ELNA",
+    "name": "El Nasr Manufacturing Agricultural Crops S.A.E",
+    "price": 36.1,
+    "change_pct": -4.32
+  },
+  {
+    "symbol": "DGTZ",
+    "name": "Digitize for Investment And Technology",
+    "price": 2.55,
+    "change_pct": 3.24
+  },
+  {
+    "symbol": "GIHD",
+    "name": "Gharbia Islamic Housing Development Company",
+    "price": 43.47,
+    "change_pct": -2.14
+  },
+  {
+    "symbol": "DCCC",
+    "name": "Damietta Container & Cargo Handling Co.",
+    "price": 1.818,
+    "change_pct": 0.0
+  },
+  {
+    "symbol": "MMAT",
+    "name": "Marsa Marsa Alam For Tourism Development SAE",
+    "price": 3.53,
+    "change_pct": 0.0
+  },
+  {
+    "symbol": "NEDA",
+    "name": "Northern Upper Egypt For Development & Agricultural Production Co.",
+    "price": 2.74,
+    "change_pct": 0.0
+  },
+  {
+    "symbol": "TRTO",
+    "name": "Trans Oceans Tours",
+    "price": 0.034,
+    "change_pct": 0.0
+  },
+  {
+    "symbol": "EPPK",
+    "name": "El Ahram Co. For Printing And Packaging SAE",
+    "price": 12.79,
+    "change_pct": 2.16
+  },
+  {
+    "symbol": "GMCI",
+    "name": "GMC Group For Industrial Commercial & Financial Investments",
+    "price": 1.71,
+    "change_pct": 0.0
+  },
+  {
+    "symbol": "EOSB",
+    "name": "El Orouba Securities Brokerage",
+    "price": 1.48,
+    "change_pct": 0.0
+  },
+  {
+    "symbol": "CPME",
+    "name": "Catalyst Partners",
+    "price": 19.0,
+    "change_pct": -1.3
+  },
+  {
+    "symbol": "COPR",
+    "name": "Copper for Commercial Investment & Real Estate Development",
+    "price": 0.365,
+    "change_pct": 0.83
+  }
+]

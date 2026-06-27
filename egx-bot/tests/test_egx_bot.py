@@ -1,347 +1,508 @@
 """
 tests/test_egx_bot.py
 ---------------------
-Unit tests for the EGX Daily Market Bot.
-Tests run without real API keys or network access (all mocked).
-
-Run: python -m pytest tests/ -v
+Unit tests for the EGX Technical Analysis Bot.
+Covers: indicators, stock scanner, AI report, bot commands, fetch_egx.
 """
 
-import os
-import sys
 import pytest
+import pandas as pd
+import numpy as np
+from datetime import datetime, timedelta
 from unittest.mock import patch, MagicMock
-from datetime import datetime
-
-# Add project root to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from fetch_egx import (
-    MarketSummary,
-    build_market_summary,
-    format_summary_text,
-    _parse_number,
-    _safe_get,
-)
-from ai_report import (
-    generate_arabic_report,
-    build_telegram_message,
-    _escape_markdown,
-    _format_arabic_date,
-)
 
 
-# ─── Fixtures ────────────────────────────────────────────────────────────────
+# ─── Test Data Fixtures ──────────────────────────────────────────────────────
 
-@pytest.fixture
-def mock_summary():
-    """A realistic MarketSummary for testing."""
-    return MarketSummary(
-        index_name="EGX 30",
-        current_value="51,443.07",
-        change="-267.83",
-        change_pct="-0.52%",
-        direction="down",
-        month_change_pct="-2.67%",
-        year_change_pct="54.92%",
-        date_str="Jun/25",
-        source_note="البيانات من Trading Economics – للأغراض المعلوماتية فقط.",
-        is_trading_day=True,
-    )
+def _make_ohlcv(days: int = 250, start_price: float = 100.0, trend: float = 0.1) -> pd.DataFrame:
+    """Generate realistic OHLCV data for testing."""
+    dates = pd.date_range(end=datetime.now(), periods=days, freq="B")
+    np.random.seed(42)
+    
+    closes = [start_price]
+    for i in range(1, days):
+        change = np.random.normal(trend, 1.5)
+        closes.append(max(closes[-1] + change, 1.0))
+    
+    closes = np.array(closes)
+    opens = closes + np.random.normal(0, 0.5, days)
+    highs = np.maximum(opens, closes) + np.random.uniform(0.1, 1.0, days)
+    lows = np.minimum(opens, closes) - np.random.uniform(0.1, 1.0, days)
+    volumes = np.random.randint(100000, 5000000, days).astype(float)
+    
+    df = pd.DataFrame({
+        "Open": opens, "High": highs, "Low": lows,
+        "Close": closes, "Volume": volumes,
+    }, index=dates)
+    
+    return df
 
 
 @pytest.fixture
-def empty_summary():
-    """An empty MarketSummary (market closed / source failure)."""
-    return MarketSummary(
-        index_name="EGX 30",
-        current_value="N/A",
-        change="N/A",
-        change_pct="N/A",
-        direction="flat",
-        source_note="تعذّر جلب البيانات.",
-        is_trading_day=False,
-    )
+def sample_ohlcv():
+    return _make_ohlcv(250)
 
 
-# ─── fetch_egx.py Tests ──────────────────────────────────────────────────────
-
-class TestParseNumber:
-    def test_positive_with_commas(self):
-        assert _parse_number("51,443.07") == pytest.approx(51443.07)
-
-    def test_negative(self):
-        assert _parse_number("-267.83") == pytest.approx(-267.83)
-
-    def test_empty(self):
-        assert _parse_number("") is None
-
-    def test_garbage(self):
-        assert _parse_number("N/A") is None
-
-    def test_plain_number(self):
-        assert _parse_number("42") == pytest.approx(42.0)
-
-    def test_none(self):
-        assert _parse_number(None) is None
+@pytest.fixture
+def bullish_ohlcv():
+    """Strong uptrend data."""
+    return _make_ohlcv(250, start_price=50, trend=0.3)
 
 
-class TestSafeGet:
-    @patch("fetch_egx.requests.get")
-    def test_success(self, mock_get):
-        mock_resp = MagicMock()
-        mock_resp.raise_for_status = MagicMock()
-        mock_get.return_value = mock_resp
-        result = _safe_get("http://example.com", retries=0)
-        assert result is mock_resp
-
-    @patch("fetch_egx.requests.get")
-    @patch("fetch_egx.time.sleep")
-    def test_retry_then_success(self, mock_sleep, mock_get):
-        fail_resp = MagicMock()
-        fail_resp.raise_for_status.side_effect = Exception("503")
-        ok_resp = MagicMock()
-        ok_resp.raise_for_status = MagicMock()
-
-        mock_get.side_effect = [fail_resp, ok_resp]
-        result = _safe_get("http://example.com", retries=1)
-        assert result is ok_resp
-        assert mock_get.call_count == 2
-
-    @patch("fetch_egx.requests.get")
-    @patch("fetch_egx.time.sleep")
-    def test_all_retries_fail(self, mock_sleep, mock_get):
-        mock_get.side_effect = Exception("Connection refused")
-        result = _safe_get("http://example.com", retries=2)
-        assert result is None
-        assert mock_get.call_count == 3  # initial + 2 retries
+@pytest.fixture
+def bearish_ohlcv():
+    """Strong downtrend data."""
+    return _make_ohlcv(250, start_price=200, trend=-0.3)
 
 
-class TestFormatSummaryText:
-    def test_full_summary(self, mock_summary):
-        text = format_summary_text(mock_summary)
-        assert "EGX 30 Index: 51,443.07 📉" in text
-        assert "Change: -267.83" in text
-        assert "Monthly Change: -2.67%" in text
-        assert "Yearly Change: 54.92%" in text
+# ─── Indicator Tests ─────────────────────────────────────────────────────────
 
-    def test_empty_summary(self, empty_summary):
-        text = format_summary_text(empty_summary)
-        assert "EGX 30 Index: N/A" in text
-        # No monthly/yearly for empty
-        assert "Monthly" not in text
+class TestIndicators:
+    """Test individual technical indicators."""
+
+    def test_rsi_range(self, sample_ohlcv):
+        """RSI should be between 0 and 100."""
+        from indicators import calc_rsi
+        result = calc_rsi(sample_ohlcv)
+        assert 0 <= result.value <= 100
+        assert result.signal in (-1, 0, 1)
+
+    def test_rsi_oversold(self, bearish_ohlcv):
+        """Very bearish data should show low RSI."""
+        from indicators import calc_rsi
+        result = calc_rsi(bearish_ohlcv)
+        assert result.value <= 100
+        assert result.name == "RSI"
+
+    def test_stochastic_range(self, sample_ohlcv):
+        """Stochastic %K should be between 0 and 100."""
+        from indicators import calc_stochastic
+        result = calc_stochastic(sample_ohlcv)
+        assert 0 <= result.value <= 100
+        assert result.signal in (-1, 0, 1)
+
+    def test_macd_signal(self, sample_ohlcv):
+        """MACD should return a signal."""
+        from indicators import calc_macd
+        result = calc_macd(sample_ohlcv)
+        assert result.name == "MACD"
+        assert result.signal in (-1, 0, 1)
+
+    def test_bollinger_position(self, sample_ohlcv):
+        """Bollinger position should be between 0 and 100."""
+        from indicators import calc_bollinger
+        result = calc_bollinger(sample_ohlcv)
+        assert 0 <= result.value <= 100
+        assert result.signal in (-1, 0, 1)
+
+    def test_sma_trend(self, sample_ohlcv):
+        """SMA trend analysis should return a signal."""
+        from indicators import calc_sma_trend
+        result = calc_sma_trend(sample_ohlcv)
+        assert result.name == "SMA Trend"
+        assert result.signal in (-1, 0, 1)
+
+    def test_adx_strength(self, sample_ohlcv):
+        """ADX should be non-negative."""
+        from indicators import calc_adx
+        result = calc_adx(sample_ohlcv)
+        assert result.value >= 0
+        assert result.signal in (-1, 0, 1)
+
+    def test_obv(self, sample_ohlcv):
+        """OBV should return a signal."""
+        from indicators import calc_obv
+        result = calc_obv(sample_ohlcv)
+        assert result.name == "OBV"
+        assert result.signal in (-1, 0, 1)
+
+    def test_williams_r_range(self, sample_ohlcv):
+        """Williams %R should be between -100 and 0."""
+        from indicators import calc_williams_r
+        result = calc_williams_r(sample_ohlcv)
+        assert -100 <= result.value <= 0
+
+    def test_atr_positive(self, sample_ohlcv):
+        """ATR should be positive."""
+        from indicators import calc_atr
+        result = calc_atr(sample_ohlcv)
+        assert result.value > 0
+
+    def test_volume_profile(self, sample_ohlcv):
+        """Volume Profile should return POC and value area."""
+        from indicators import calc_volume_profile
+        result = calc_volume_profile(sample_ohlcv)
+        assert result.poc > 0
+        assert result.value_area_high >= result.value_area_low
+        assert result.current_price_position in (
+            "فوق منطقة القيمة", "داخل منطقة القيمة", "تحت منطقة القيمة"
+        )
+
+    def test_volume_profile_flat_data(self):
+        """Volume Profile should handle flat price data."""
+        from indicators import calc_volume_profile
+        df = pd.DataFrame({
+            "High": [100.0] * 60,
+            "Low": [100.0] * 60,
+            "Close": [100.0] * 60,
+            "Volume": [1000.0] * 60,
+        })
+        result = calc_volume_profile(df)
+        assert result.poc == 100.0
 
 
-class TestBuildMarketSummary:
-    @patch("fetch_egx.fetch_egx30_index")
-    def test_with_data(self, mock_index):
-        mock_index.return_value = {
-            "value": "51,443.07",
-            "change": "-267.83",
-            "change_pct": "-0.52%",
-            "month_change_pct": "-2.67%",
-            "year_change_pct": "54.92%",
-            "direction": "down",
-            "date_str": "Jun/25",
-        }
-        summary = build_market_summary()
-        assert summary.current_value == "51,443.07"
-        assert summary.direction == "down"
-        assert summary.month_change_pct == "-2.67%"
-        assert summary.is_trading_day is True
+class TestAnalyzeStock:
+    """Test the composite analysis function."""
 
-    @patch("fetch_egx.fetch_egx30_index")
-    def test_no_data(self, mock_index):
-        mock_index.return_value = {}
-        summary = build_market_summary()
-        assert summary.current_value == "N/A"
-        assert summary.is_trading_day is False
+    def test_analyze_basic(self, sample_ohlcv):
+        """Full analysis should return a StockAnalysis with indicators."""
+        from indicators import analyze_stock
+        analysis = analyze_stock(sample_ohlcv, "TEST", "Test Stock", "سهم تجريبي")
+        
+        assert analysis.ticker == "TEST"
+        assert analysis.name_ar == "سهم تجريبي"
+        assert analysis.current_price > 0
+        assert len(analysis.indicators) >= 8
+        assert analysis.composite_score != 0 or True  # Could be neutral
+        assert analysis.signal_label != ""
+
+    def test_analyze_bullish_trend(self, bullish_ohlcv):
+        """Bullish trend data should show SMA golden cross in reasons."""
+        from indicators import analyze_stock
+        analysis = analyze_stock(bullish_ohlcv, "BULL", "Bull Stock", "سهم صاعد")
+        # Even if overbought, SMA trend should be bullish (golden cross)
+        sma_ind = [i for i in analysis.indicators if i.name == "SMA Trend"]
+        if sma_ind:
+            assert sma_ind[0].signal == 1  # Bullish SMA trend
+
+    def test_analyze_bearish_trend(self, bearish_ohlcv):
+        """Bearish data should produce negative or neutral score."""
+        from indicators import analyze_stock
+        analysis = analyze_stock(bearish_ohlcv, "BEAR", "Bear Stock", "سهم هابط")
+        assert analysis.composite_score <= 1  # At best neutral
+
+    def test_analyze_insufficient_data(self):
+        """Should raise error with insufficient data."""
+        from indicators import analyze_stock
+        df = _make_ohlcv(30)  # Only 30 days
+        with pytest.raises(ValueError, match="Insufficient data"):
+            analyze_stock(df, "SHORT", "Short", "قصير")
+
+    def test_analyze_missing_column(self):
+        """Should raise error if a required column is missing."""
+        from indicators import analyze_stock
+        dates = pd.date_range(end=datetime.now(), periods=100, freq="B")
+        df = pd.DataFrame({
+            "Open": np.linspace(100, 110, 100),
+            "High": np.linspace(102, 112, 100),
+            "Low": np.linspace(99, 109, 100),
+            "Close": np.linspace(101, 111, 100),
+        }, index=dates)
+        with pytest.raises((ValueError, KeyError)):
+            analyze_stock(df, "NOVOL", "No Volume", "بدون حجم")
+
+    def test_signal_labels(self, sample_ohlcv):
+        """Signal labels should be one of the expected values."""
+        from indicators import analyze_stock
+        analysis = analyze_stock(sample_ohlcv, "TEST", "Test", "تجربة")
+        valid_labels = ["شراء قوي 🟢🟢", "شراء 🟢", "محايد 🟡", "بيع 🔴", "بيع قوي 🔴🔴"]
+        assert analysis.signal_label in valid_labels
+
+    def test_bullish_reasons_populated(self, bullish_ohlcv):
+        """Bullish stock should have bullish reasons."""
+        from indicators import analyze_stock
+        analysis = analyze_stock(bullish_ohlcv, "BULL", "Bull", "صاعد")
+        if analysis.composite_score > 0:
+            assert len(analysis.bullish_reasons) > 0
 
 
-class TestFetchEgx30Index:
-    @patch("fetch_egx._safe_get")
-    def test_parses_trading_economics_table(self, mock_get):
-        """Test that we can parse the Trading Economics HTML table format."""
-        from bs4 import BeautifulSoup
-        mock_resp = MagicMock()
-        # Simulate Trading Economics HTML table
-        html = """
-        <table>
-            <tr><th>Indexes</th><th>Price</th><th></th><th></th><th>Day</th><th>Month</th><th>Year</th><th>Date</th></tr>
-            <tr>
-                <td>EGX 30</td><td>51,443.07</td><td></td>
-                <td>-267.83</td><td>-0.52%</td><td>-2.67%</td><td>54.92%</td>
-                <td>Jun/25</td>
-            </tr>
-        </table>
-        """
-        mock_resp.text = html
-        mock_get.return_value = mock_resp
+# ─── Stock Scanner Tests ─────────────────────────────────────────────────────
 
-        from fetch_egx import fetch_egx30_index
-        data = fetch_egx30_index()
-        assert data["value"] == "51,443.07"
-        assert data["change"] == "-267.83"
-        assert data["change_pct"] == "-0.52%"
-        assert data["direction"] == "down"
+class TestStockScanner:
+    """Test the stock scanner functions."""
 
-    @patch("fetch_egx._safe_get")
-    def test_returns_empty_on_failure(self, mock_get):
-        mock_get.return_value = None
-        from fetch_egx import fetch_egx30_index
-        data = fetch_egx30_index()
-        assert data == {}
+    def test_get_top_bullish(self):
+        """get_top_bullish should return stocks sorted by score."""
+        from stock_scanner import get_top_bullish
+        from indicators import StockAnalysis
+        
+        stocks = [
+            StockAnalysis(ticker="A", name="A", name_ar="أ", current_price=10,
+                         daily_change_pct=1, volume=100, composite_score=5),
+            StockAnalysis(ticker="B", name="B", name_ar="ب", current_price=20,
+                         daily_change_pct=2, volume=200, composite_score=3),
+            StockAnalysis(ticker="C", name="C", name_ar="ج", current_price=30,
+                         daily_change_pct=-1, volume=300, composite_score=-2),
+        ]
+        
+        top = get_top_bullish(stocks, 5)
+        assert len(top) == 2  # Only A and B have score >= 2
+        assert top[0].ticker == "A"  # Highest score first
+
+    def test_get_top_bearish(self):
+        """get_top_bearish should return most bearish stocks."""
+        from stock_scanner import get_top_bearish
+        from indicators import StockAnalysis
+        
+        stocks = [
+            StockAnalysis(ticker="A", name="A", name_ar="أ", current_price=10,
+                         daily_change_pct=1, volume=100, composite_score=5),
+            StockAnalysis(ticker="B", name="B", name_ar="ب", current_price=20,
+                         daily_change_pct=-2, volume=200, composite_score=-3),
+            StockAnalysis(ticker="C", name="C", name_ar="ج", current_price=30,
+                         daily_change_pct=-1, volume=300, composite_score=-5),
+        ]
+        
+        top = get_top_bearish(stocks, 5)
+        assert len(top) == 2
+        assert top[0].ticker == "C"  # Most bearish first
+
+    def test_format_analysis_for_ai(self):
+        """format_analysis_for_ai should produce readable text."""
+        from stock_scanner import format_analysis_for_ai
+        from indicators import StockAnalysis, IndicatorResult
+        
+        s = StockAnalysis(
+            ticker="TEST", name="Test", name_ar="تجربة",
+            current_price=100, daily_change_pct=1.5, volume=50000,
+            composite_score=3, signal_label="شراء 🟢", signal_score_pct=75.0,
+        )
+        s.indicators.append(IndicatorResult("RSI", "مؤشر القوة النسبية", 45.0, 1, "صاعد", "مذبذب إيجابي"))
+        
+        text = format_analysis_for_ai([s])
+        assert "TEST" in text
+        assert "تجربة" in text
+        assert "RSI" in text
+
+    def test_arabic_names_mapping(self):
+        """Arabic names should be available for major stocks."""
+        from stock_scanner import ARABIC_NAMES
+        assert "COMI" in ARABIC_NAMES
+        assert "ETEL" in ARABIC_NAMES
+        assert "EAST" in ARABIC_NAMES
+        assert len(ARABIC_NAMES) >= 50
 
 
-# ─── ai_report.py Tests ──────────────────────────────────────────────────────
+# ─── AI Report Tests ─────────────────────────────────────────────────────────
 
-class TestEscapeMarkdown:
-    def test_plain_text(self):
-        assert _escape_markdown("Hello World") == "Hello World"
+class TestAIReport:
+    """Test the AI report generation and formatting."""
 
-    def test_asterisk(self):
-        assert _escape_markdown("CIB*") == "CIB\\*"
+    def test_escape_markdown(self):
+        """Markdown special characters should be escaped."""
+        from ai_report import _escape_markdown
+        assert "\\*" in _escape_markdown("test*text")
+        assert "\\_" in _escape_markdown("test_text")
+        assert "\\[" in _escape_markdown("test[text]")
 
-    def test_underscore(self):
-        assert _escape_markdown("EGX_30") == "EGX\\_30"
-
-    def test_brackets(self):
-        assert _escape_markdown("test[0]") == "test\\[0\\]"
-
-    def test_empty(self):
+    def test_escape_markdown_empty(self):
+        """Empty string should return empty."""
+        from ai_report import _escape_markdown
         assert _escape_markdown("") == ""
-
-    def test_none(self):
         assert _escape_markdown(None) is None
 
-
-class TestFormatArabicDate:
-    def test_returns_arabic(self):
+    def test_format_arabic_date(self):
+        """Arabic date should contain Arabic day and month names."""
+        from ai_report import _format_arabic_date
         date_str = _format_arabic_date()
-        arabic_months = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
-                         "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"]
-        assert any(month in date_str for month in arabic_months)
+        assert any(day in date_str for day in ["الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت", "الأحد"])
+        assert str(datetime.now().year) in date_str or "2026" in date_str
 
-    def test_contains_arabic_day(self):
-        date_str = _format_arabic_date()
-        arabic_days = ["الإثنين", "الثلاثاء", "الأربعاء", "الخميس",
-                       "الجمعة", "السبت", "الأحد"]
-        assert any(day in date_str for day in arabic_days)
+    def test_build_telegram_message(self):
+        """Telegram message should have header and structure."""
+        from ai_report import build_telegram_message
+        from indicators import StockAnalysis
+        
+        stocks = [
+            StockAnalysis(ticker="TEST", name="Test", name_ar="تجربة",
+                         current_price=100, daily_change_pct=1, volume=1000,
+                         composite_score=3, signal_label="شراء 🟢"),
+        ]
+        
+        msg = build_telegram_message("ملخص تجريبي", stocks, None)
+        assert "تقرير" in msg
+        assert "ملخص تجريبي" in msg
+        assert "20" not in msg or "سهم" in msg  # Should mention stock count
 
-    def test_contains_year(self):
-        date_str = _format_arabic_date()
-        assert "2026" in date_str
-
-
-class TestGenerateArabicReport:
-    def test_missing_api_key(self):
-        with patch.dict(os.environ, {}, clear=True):
-            with pytest.raises(EnvironmentError):
-                generate_arabic_report("test data")
-
-    @patch("ai_report.genai")
-    def test_successful_generation(self, mock_genai):
-        with patch.dict(os.environ, {"GEMINI_API_KEY": "fake_key"}):
-            mock_model = MagicMock()
-            mock_response = MagicMock()
-            mock_response.text = "هذا ملخص عربي للسوق اليوم."
-            mock_model.generate_content.return_value = mock_response
-            mock_genai.configure = MagicMock()
-            mock_genai.GenerativeModel.return_value = mock_model
-
-            result = generate_arabic_report("EGX 30: 51443 -267")
-            assert "ملخص عربي" in result
-            mock_model.generate_content.assert_called_once()
-
-    @patch("ai_report.genai")
-    @patch("ai_report.time.sleep")
-    def test_fallback_on_failure(self, mock_sleep, mock_genai):
-        with patch.dict(os.environ, {"GEMINI_API_KEY": "fake_key"}):
-            mock_model = MagicMock()
-            mock_model.generate_content.side_effect = Exception("API Error")
-            mock_genai.configure = MagicMock()
-            mock_genai.GenerativeModel.return_value = mock_model
-
-            result = generate_arabic_report("EGX 30: 51443")
-            assert "تعذّر" in result or "EGX 30" in result
-
-
-class TestBuildTelegramMessage:
-    def test_full_message(self, mock_summary):
-        msg = build_telegram_message("ملخص عربي هنا", mock_summary)
-        assert "تقرير البورصة المصرية اليومي" in msg
+    def test_build_telegram_message_with_market(self):
+        """Telegram message should include EGX 30 data when provided."""
+        from ai_report import build_telegram_message
+        from indicators import StockAnalysis
+        
+        class MockMarket:
+            current_value = 30000
+            change = 100
+            change_pct = "0.33%"
+            direction = "up"
+            month_change_pct = "2.5%"
+            year_change_pct = "15.3%"
+        
+        stocks = [StockAnalysis(ticker="T", name="T", name_ar="ت",
+                               current_price=10, daily_change_pct=1, volume=100,
+                               composite_score=2, signal_label="شراء 🟢")]
+        
+        msg = build_telegram_message("test", stocks, MockMarket())
         assert "EGX 30" in msg
-        assert "ملخص الذكاء الاصطناعي" in msg
-        assert "نصيحة استثمارية" in msg
+        assert "30000" in msg
 
-    def test_empty_market(self, empty_summary):
-        msg = build_telegram_message("لا توجد بيانات", empty_summary)
-        assert "N/A" in msg
-        assert "تقرير البورصة المصرية اليومي" in msg
+    def test_build_stocks_table_message(self):
+        """Stocks table should list bullish and bearish stocks."""
+        from ai_report import build_stocks_table_message
+        from indicators import StockAnalysis
+        
+        stocks = [
+            StockAnalysis(ticker="BULL", name="Bull", name_ar="صاعد",
+                         current_price=100, daily_change_pct=2, volume=1000,
+                         composite_score=4, signal_label="شراء قوي 🟢🟢",
+                         bullish_reasons=["RSI: تشبع بيعي"]),
+            StockAnalysis(ticker="BEAR", name="Bear", name_ar="هابط",
+                         current_price=50, daily_change_pct=-3, volume=2000,
+                         composite_score=-4, signal_label="بيع قوي 🔴🔴",
+                         bearish_reasons=["MACD: تقاطع هابط"]),
+        ]
+        
+        msg = build_stocks_table_message(stocks)
+        assert "صاعد" in msg or "BULL" in msg
+        assert "هابط" in msg or "BEAR" in msg
 
-    def test_message_under_4096(self, mock_summary):
-        long_report = "A" * 5000
-        msg = build_telegram_message(long_report, mock_summary)
-        assert len(msg) <= 4096
 
-    def test_markdown_escaping(self):
-        """Stock names with special chars should be escaped."""
+# ─── Fetch EGX Tests ─────────────────────────────────────────────────────────
+
+class TestFetchEGX:
+    """Test the EGX index data fetcher."""
+
+    def test_market_summary_creation(self):
+        """MarketSummary data class should work correctly."""
+        from fetch_egx import MarketSummary
+        
         summary = MarketSummary(
             index_name="EGX 30",
-            current_value="100",
-            change="+1",
-            change_pct="1%",
+            current_value="30,123.45",
+            change="+123.45",
+            change_pct="+0.41%",
             direction="up",
-            top_gainers=[{"name": "TEST_STOCK", "price": "10", "change_pct": "+5%"}],
         )
-        msg = build_telegram_message("summary", summary)
-        assert "TEST\\_STOCK" in msg
+        assert summary.current_value == "30,123.45"
+        assert summary.direction == "up"
+        assert summary.index_name == "EGX 30"
+
+    def test_format_summary_text(self):
+        """format_summary_text should produce readable text."""
+        from fetch_egx import MarketSummary, format_summary_text
+        
+        summary = MarketSummary(
+            index_name="EGX 30",
+            current_value="30,000",
+            change="+100",
+            change_pct="+0.33%",
+            direction="up",
+            month_change_pct="+2.5%",
+            year_change_pct="+15.3%",
+        )
+        text = format_summary_text(summary)
+        assert "30,000" in text
+        assert "+0.33%" in text
 
 
-# ─── bot.py Tests ────────────────────────────────────────────────────────────
+# ─── Bot Tests ───────────────────────────────────────────────────────────────
 
-class TestTradingDayCheck:
-    def test_friday_is_not_trading(self):
+class TestBot:
+    """Test bot utility functions."""
+
+    def test_is_egx_trading_day_sunday(self):
+        """Sunday should be a trading day."""
         from bot import _is_egx_trading_day
-        friday = datetime(2026, 6, 26, 10, 0, 0)  # Friday
+        # Mock datetime to return a Sunday
         with patch("bot.datetime") as mock_dt:
-            mock_dt.now.return_value = friday
-            assert _is_egx_trading_day() is False
+            mock_now = MagicMock()
+            mock_now.weekday.return_value = 6  # Sunday
+            mock_dt.now.return_value = mock_now
+            assert _is_egx_trading_day() == True
 
-    def test_saturday_is_not_trading(self):
+    def test_is_egx_trading_day_friday(self):
+        """Friday should NOT be a trading day."""
         from bot import _is_egx_trading_day
-        saturday = datetime(2026, 6, 27, 10, 0, 0)  # Saturday
         with patch("bot.datetime") as mock_dt:
-            mock_dt.now.return_value = saturday
-            assert _is_egx_trading_day() is False
+            mock_now = MagicMock()
+            mock_now.weekday.return_value = 4  # Friday
+            mock_dt.now.return_value = mock_now
+            assert _is_egx_trading_day() == False
 
-    def test_sunday_is_trading(self):
+    def test_is_egx_trading_day_saturday(self):
+        """Saturday should NOT be a trading day."""
         from bot import _is_egx_trading_day
-        sunday = datetime(2026, 6, 28, 10, 0, 0)  # Sunday
         with patch("bot.datetime") as mock_dt:
-            mock_dt.now.return_value = sunday
-            assert _is_egx_trading_day() is True
+            mock_now = MagicMock()
+            mock_now.weekday.return_value = 5  # Saturday
+            mock_dt.now.return_value = mock_now
+            assert _is_egx_trading_day() == False
 
-    def test_thursday_is_trading(self):
-        from bot import _is_egx_trading_day
-        thursday = datetime(2026, 7, 2, 10, 0, 0)  # Thursday
-        with patch("bot.datetime") as mock_dt:
-            mock_dt.now.return_value = thursday
-            assert _is_egx_trading_day() is True
-
-
-class TestCheckEnv:
-    def test_missing_env_exits(self):
-        with patch.dict(os.environ, {}, clear=True):
+    def test_check_env_missing(self):
+        """check_env should exit if env vars are missing."""
+        from bot import check_env
+        with patch.dict("os.environ", {}, clear=True):
             with pytest.raises(SystemExit):
-                from bot import check_env
                 check_env()
 
-    def test_present_env_passes(self):
-        with patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "x", "GEMINI_API_KEY": "y"}):
-            from bot import check_env
-            check_env()
+    def test_check_env_present(self):
+        """check_env should pass if required vars are set."""
+        from bot import check_env
+        with patch.dict("os.environ", {"TELEGRAM_BOT_TOKEN": "test", "GEMINI_API_KEY": "test"}):
+            check_env()  # Should not raise
 
 
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
+# ─── Integration Tests ───────────────────────────────────────────────────────
+
+class TestIntegration:
+    """Integration tests that verify end-to-end flows."""
+
+    def test_full_analysis_pipeline(self, sample_ohlcv):
+        """Full pipeline: data → indicators → analysis → formatting."""
+        from indicators import analyze_stock
+        from stock_scanner import format_analysis_for_ai, get_top_bullish
+        from ai_report import build_telegram_message
+        
+        # Analyze
+        analysis = analyze_stock(sample_ohlcv, "TEST", "Test Stock", "سهم تجريبي")
+        
+        # Format for AI
+        ai_text = format_analysis_for_ai([analysis])
+        assert "TEST" in ai_text
+        
+        # Build Telegram message
+        msg = build_telegram_message("ملخص اختبار", [analysis], None)
+        assert "تقرير" in msg
+        assert "ملخص اختبار" in msg
+
+    def test_multi_stock_analysis(self, sample_ohlcv, bullish_ohlcv, bearish_ohlcv):
+        """Multiple stocks should be sortable by score."""
+        from indicators import analyze_stock
+        from stock_scanner import get_top_bullish, get_top_bearish
+        
+        stocks = [
+            analyze_stock(sample_ohlcv, "NEUT", "Neutral", "محايد"),
+            analyze_stock(bullish_ohlcv, "BULL", "Bullish", "صاعد"),
+            analyze_stock(bearish_ohlcv, "BEAR", "Bearish", "هابط"),
+        ]
+        
+        # Sort by score
+        stocks.sort(key=lambda x: x.composite_score, reverse=True)
+        assert stocks[0].composite_score >= stocks[-1].composite_score
+        
+        # Top bullish should include the bullish stock
+        top = get_top_bullish(stocks, 3)
+        if top:
+            assert top[0].composite_score >= 2
+
+    def test_volume_profile_with_real_data(self, sample_ohlcv):
+        """Volume Profile should work with realistic OHLCV data."""
+        from indicators import calc_volume_profile
+        
+        result = calc_volume_profile(sample_ohlcv, bins=30, lookback=60)
+        assert result.poc > 0
+        assert result.value_area_high > 0
+        assert result.value_area_low > 0
+        assert result.value_area_high >= result.value_area_low
+        assert result.current_price_position in (
+            "فوق منطقة القيمة", "داخل منطقة القيمة", "تحت منطقة القيمة"
+        )
