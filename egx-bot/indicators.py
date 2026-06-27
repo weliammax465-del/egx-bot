@@ -9,7 +9,6 @@ Indicators calculated:
   - MACD (12, 26, 9)
   - Bollinger Bands (20, 2)
   - SMA (20, 50, 200)
-  - EMA (12, 26)
   - ADX (14) — trend strength
   - OBV (On-Balance Volume)
   - Volume Profile (POC, Value Area, High Volume Nodes)
@@ -72,8 +71,8 @@ class StockAnalysis:
     indicators: list[IndicatorResult] = field(default_factory=list)
     volume_profile: Optional[VolumeProfileResult] = None
     composite_score: int = 0
-    signal_label: str = "محايد"       # "شراء قوي", "شراء", "محايد", "بيع", "بيع قوي"
-    signal_score_pct: float = 0.0     # 0-100 confidence
+    signal_label: str = "محايد 🟡"
+    signal_score_pct: float = 0.0
     bullish_reasons: list[str] = field(default_factory=list)
     bearish_reasons: list[str] = field(default_factory=list)
 
@@ -97,18 +96,18 @@ def _signal_text(score: int) -> str:
 
 
 def calc_rsi(df: pd.DataFrame, period: int = 14) -> IndicatorResult:
-    """RSI — oversold < 30, overbought > 70."""
+    """RSI — oversold < 30 (bullish reversal), overbought > 70 (bearish correction)."""
     rsi_ind = RSIIndicator(close=df["Close"], window=period)
     rsi = rsi_ind.rsi().iloc[-1]
 
     if rsi < 30:
-        signal, note = 1, "تشبع بيعي — احتمال ارتداد"
+        signal, note = 1, "تشبع بيعي — احتمال ارتداد صاعد"
     elif rsi > 70:
-        signal, note = -1, "تشبع شرائي — احتمال تصحيح"
-    elif rsi < 45:
-        signal, note = 1, "قوة شرائية ضعيفة"
+        signal, note = -1, "تشبع شرائي — احتمال تصحيح هابط"
     elif rsi > 55:
-        signal, note = -1, "قوة شرائية قوية"
+        signal, note = 1, "زخم صاعد قوي"
+    elif rsi < 45:
+        signal, note = -1, "زخم هابط ضعيف"
     else:
         signal, note = 0, "منطقة محايدة"
 
@@ -241,15 +240,8 @@ def calc_sma_trend(df: pd.DataFrame) -> IndicatorResult:
     bullish_stack = price > sma20 > sma50
     bearish_stack = price < sma20 < sma50
 
-    if has_sma200 and sma50 > sma200:
-        golden_cross = True
-    else:
-        golden_cross = False
-
-    if has_sma200 and sma50 < sma200:
-        death_cross = True
-    else:
-        death_cross = False
+    golden_cross = has_sma200 and sma50 > sma200
+    death_cross = has_sma200 and sma50 < sma200
 
     if bullish_stack and golden_cross:
         signal, note = 1, "ترتيب صاعد كامل (Golden Cross) — اتجاه صاعد قوي"
@@ -386,8 +378,9 @@ def calc_volume_profile(df: pd.DataFrame, bins: int = 30, lookback: int = 60) ->
         vol = row["Volume"]
         price_range = high - low
         if price_range <= 0:
-            # Assign to single bin
-            idx = np.searchsorted(bin_edges, current_price) - 1
+            # Flat candle — assign to the row's own close price bin
+            row_price = row["Close"]
+            idx = np.searchsorted(bin_edges, row_price) - 1
             idx = max(0, min(bins - 1, idx))
             volume_per_bin[idx] += vol
         else:
@@ -397,11 +390,20 @@ def calc_volume_profile(df: pd.DataFrame, bins: int = 30, lookback: int = 60) ->
                     volume_per_bin[i] += vol * (overlap / price_range)
 
     # POC — bin with highest volume
-    poc_idx = np.argmax(volume_per_bin)
+    poc_idx = int(np.argmax(volume_per_bin))
     poc_price = (bin_edges[poc_idx] + bin_edges[poc_idx + 1]) / 2
 
     # Value Area — 70% of volume around POC
     total_vol = volume_per_bin.sum()
+    if total_vol == 0:
+        return VolumeProfileResult(
+            poc=round(poc_price, 2),
+            value_area_high=round(float(bin_edges[-1]), 2),
+            value_area_low=round(float(bin_edges[0]), 2),
+            current_price_position="داخل منطقة القيمة",
+            signal=0, signal_text="محايد",
+        )
+
     target_vol = total_vol * 0.70
 
     # Expand from POC outward
@@ -433,8 +435,8 @@ def calc_volume_profile(df: pd.DataFrame, bins: int = 30, lookback: int = 60) ->
         else:
             break
 
-    va_low = bin_edges[min(va_indices)]
-    va_high = bin_edges[max(va_indices) + 1]
+    va_low = float(bin_edges[min(va_indices)])
+    va_high = float(bin_edges[max(va_indices) + 1])
 
     # Position relative to value area
     if current_price > va_high:
@@ -451,7 +453,7 @@ def calc_volume_profile(df: pd.DataFrame, bins: int = 30, lookback: int = 60) ->
         signal_text = "محايد"
 
     return VolumeProfileResult(
-        poc=round(poc_price, 2),
+        poc=round(float(poc_price), 2),
         value_area_high=round(va_high, 2),
         value_area_low=round(va_low, 2),
         current_price_position=position,
@@ -478,7 +480,7 @@ def calc_atr(df: pd.DataFrame, period: int = 14) -> IndicatorResult:
     # ATR is informational — no buy/sell signal
     return IndicatorResult(
         name="ATR", name_ar="متوسط المدى الحقيقي",
-        value=round(atr_pct, 2), signal=0,
+        value=round(float(atr_pct), 2), signal=0,
         signal_text="معلومة", note=note,
     )
 
@@ -502,11 +504,18 @@ def analyze_stock(
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = df.columns.droplevel(1)
 
-    # Ensure correct dtypes
-    for col in ["Open", "High", "Low", "Close", "Volume"]:
-        if col not in df.columns:
-            raise ValueError(f"Missing column {col} in data for {ticker}")
+    # Ensure required columns exist
+    required = ["Open", "High", "Low", "Close", "Volume"]
+    missing = [c for c in required if c not in df.columns]
+    if missing:
+        raise ValueError(f"Missing column(s) {missing} in data for {ticker}")
 
+    # Drop rows with NaN in critical columns
+    df = df.dropna(subset=required)
+    if len(df) < 50:
+        raise ValueError(f"Insufficient non-NaN data for {ticker}: {len(df)} rows after dropna")
+
+    # Ensure correct dtypes
     df = df.astype({"Open": float, "High": float, "Low": float, "Close": float, "Volume": float})
 
     current_price = float(df["Close"].iloc[-1])
@@ -524,59 +533,32 @@ def analyze_stock(
     )
 
     # ── Calculate all indicators ──
-    try:
-        analysis.indicators.append(calc_rsi(df))
-    except Exception as e:
-        logger.warning(f"RSI failed for {ticker}: {e}")
+    indicator_fns = [
+        ("RSI", calc_rsi),
+        ("Stochastic", calc_stochastic),
+        ("MACD", calc_macd),
+        ("Bollinger", calc_bollinger),
+        ("SMA Trend", calc_sma_trend),
+        ("ADX", calc_adx),
+        ("OBV", calc_obv),
+        ("Williams %R", calc_williams_r),
+        ("ATR", calc_atr),
+    ]
 
-    try:
-        analysis.indicators.append(calc_stochastic(df))
-    except Exception as e:
-        logger.warning(f"Stochastic failed for {ticker}: {e}")
-
-    try:
-        analysis.indicators.append(calc_macd(df))
-    except Exception as e:
-        logger.warning(f"MACD failed for {ticker}: {e}")
-
-    try:
-        analysis.indicators.append(calc_bollinger(df))
-    except Exception as e:
-        logger.warning(f"Bollinger failed for {ticker}: {e}")
-
-    try:
-        analysis.indicators.append(calc_sma_trend(df))
-    except Exception as e:
-        logger.warning(f"SMA trend failed for {ticker}: {e}")
-
-    try:
-        analysis.indicators.append(calc_adx(df))
-    except Exception as e:
-        logger.warning(f"ADX failed for {ticker}: {e}")
-
-    try:
-        analysis.indicators.append(calc_obv(df))
-    except Exception as e:
-        logger.warning(f"OBV failed for {ticker}: {e}")
-
-    try:
-        analysis.indicators.append(calc_williams_r(df))
-    except Exception as e:
-        logger.warning(f"Williams %R failed for {ticker}: {e}")
+    for ind_name, fn in indicator_fns:
+        try:
+            analysis.indicators.append(fn(df))
+        except Exception as e:
+            logger.warning(f"{ind_name} failed for {ticker}: {e}")
 
     try:
         analysis.volume_profile = calc_volume_profile(df)
     except Exception as e:
         logger.warning(f"Volume Profile failed for {ticker}: {e}")
 
-    try:
-        analysis.indicators.append(calc_atr(df))
-    except Exception as e:
-        logger.warning(f"ATR failed for {ticker}: {e}")
-
     # ── Composite score ──
-    # Only count directional indicators (skip ATR which is informational)
-    directional_indicators = [i for i in analysis.indicators if i.signal != 0 or i.name != "ATR"]
+    # Only count directional indicators (exclude ATR which is informational)
+    directional_indicators = [i for i in analysis.indicators if i.name != "ATR"]
     scores = [i.signal for i in directional_indicators]
 
     # Add volume profile signal
@@ -587,7 +569,7 @@ def analyze_stock(
     analysis.composite_score = composite
 
     # Signal label based on composite score
-    max_possible = len(scores)  # Maximum possible score
+    max_possible = len(scores)
     if max_possible > 0:
         analysis.signal_score_pct = round((composite / max_possible + 1) / 2 * 100, 1)
     else:

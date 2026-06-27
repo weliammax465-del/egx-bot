@@ -72,7 +72,8 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "الأوامر المتاحة:\n"
         "• /report — تقرير تحليلي كامل لكل الأسهم\n"
         "• /scan — مسح سريع لأقوى الأسهم صعودًا وهبوطًا\n\n"
-        "⚠️ _المعلومات للأغراض المعلوماتية فقط\\._",
+        "📊 يتم تحليل جميع أسهم البورصة المصرية (224+ سهم)\n"
+        "🔬 باستخدام 9 مؤشرات تقنية احترافية",
         parse_mode=ParseMode.MARKDOWN,
     )
 
@@ -85,10 +86,7 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     )
 
     try:
-        # Fetch EGX 30 index data
         market_summary = build_market_summary()
-
-        # Scan all stocks
         stocks = scan_all_stocks()
 
         if not stocks:
@@ -97,11 +95,10 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             )
             return
 
-        # Generate AI report
-        analysis_text = format_analysis_for_ai(stocks)
+        market_text = format_summary_text(market_summary) if market_summary else ""
+        analysis_text = format_analysis_for_ai(stocks, market_text)
         ai_report = generate_arabic_report(analysis_text)
 
-        # Build and send main message
         main_message = build_telegram_message(ai_report, stocks, market_summary)
         await msg.delete()
         await update.message.reply_text(
@@ -109,7 +106,6 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             parse_mode=ParseMode.MARKDOWN,
         )
 
-        # Send detailed stocks table as second message
         stocks_table = build_stocks_table_message(stocks)
         if stocks_table and len(stocks_table) > 50:
             await update.message.reply_text(
@@ -160,7 +156,6 @@ async def cmd_scan(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def send_scheduled_report() -> None:
     """
     Push daily professional technical analysis report to TELEGRAM_CHAT_ID.
-    Called directly (not via polling) from GitHub Actions with --scheduled flag.
     Sends two messages: main report + detailed stocks table.
     """
     token = os.environ["TELEGRAM_BOT_TOKEN"]
@@ -172,13 +167,11 @@ async def send_scheduled_report() -> None:
 
     bot = Bot(token=token)
 
-    # Skip non-trading days to save API quota
     if not _is_egx_trading_day():
         logger.info("Today is not an EGX trading day (weekend). Skipping.")
         return
 
     try:
-        # Send "generating" notification
         await bot.send_message(
             chat_id=chat_id,
             text=(
@@ -188,10 +181,7 @@ async def send_scheduled_report() -> None:
             ),
         )
 
-        # Fetch EGX 30 index data
         market_summary = build_market_summary()
-
-        # Scan all stocks
         stocks = scan_all_stocks()
 
         if not stocks:
@@ -202,11 +192,10 @@ async def send_scheduled_report() -> None:
             logger.info("No stock data available. Sent notification and exiting.")
             return
 
-        # Generate AI report
-        analysis_text = format_analysis_for_ai(stocks)
+        market_text = format_summary_text(market_summary) if market_summary else ""
+        analysis_text = format_analysis_for_ai(stocks, market_text)
         ai_report = generate_arabic_report(analysis_text)
 
-        # Build and send main message
         main_message = build_telegram_message(ai_report, stocks, market_summary)
         await bot.send_message(
             chat_id=chat_id,
@@ -214,7 +203,6 @@ async def send_scheduled_report() -> None:
             parse_mode=ParseMode.MARKDOWN,
         )
 
-        # Send detailed stocks table as second message
         stocks_table = build_stocks_table_message(stocks)
         if stocks_table and len(stocks_table) > 50:
             await bot.send_message(
@@ -226,7 +214,9 @@ async def send_scheduled_report() -> None:
         logger.info("Scheduled professional report sent successfully.")
 
     except Exception as e:
-        logger.error(f"Failed to send scheduled report: {e}", exc_info=True)
+        # Sanitize error message — don't expose bot token in logs
+        safe_err = str(e).replace(token, "[REDACTED]")
+        logger.error(f"Failed to send scheduled report: {safe_err}", exc_info=True)
         try:
             await bot.send_message(
                 chat_id=chat_id,
@@ -242,13 +232,11 @@ async def send_scheduled_report() -> None:
 def main() -> None:
     check_env()
 
-    # If called with --scheduled flag, send once and exit (for GitHub Actions)
     if "--scheduled" in sys.argv:
         import asyncio
         asyncio.run(send_scheduled_report())
         return
 
-    # Otherwise, start the interactive polling bot
     token = os.environ["TELEGRAM_BOT_TOKEN"]
     app = Application.builder().token(token).build()
 

@@ -1,14 +1,10 @@
 name: EGX Daily Technical Analysis Report
 
 on:
-  # Runs at 9:00 AM Cairo time (UTC+2, year-round — Egypt cancelled DST in 2024)
-  # 9:00 AM Cairo = 7:00 AM UTC
-  # Sunday–Thursday = EGX trading days (cron: 0=Sunday in GitHub Actions)
   schedule:
     - cron: "0 7 * * 0-4"
-
-  # Allow manual trigger from GitHub Actions UI
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
@@ -45,3 +41,20 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python bot.py --scheduled
+
+      - name: Notify on failure
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server-address: smtp.gmail.com
+          server-port: 465
+          username: ${{ secrets.SMTP_USER }}
+          password: ${{ secrets.SMTP_PASS }}
+          subject: "❌ EGX Bot — Workflow Failed"
+          to: ${{ secrets.NOTIFY_EMAIL }}
+          from: EGX Bot
+          body: |
+            The EGX Daily Technical Analysis workflow has failed.
+            Check the logs at:
+            https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        continue-on-error: true

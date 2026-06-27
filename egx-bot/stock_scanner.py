@@ -7,6 +7,7 @@ Data sources:
   1. stockanalysis.com — scraped for the full list of all EGX stocks with 
      current prices and daily changes (real-time data)
   2. TradingView (tvdatafeed) — historical OHLCV data for technical indicators
+  3. egx_stocks.json — fallback stock list if scraping fails
 
 The scanner:
   - Scrapes the full EGX stock list with live prices
@@ -18,6 +19,7 @@ The scanner:
 
 from __future__ import annotations
 
+import os
 import json
 import logging
 import time
@@ -44,7 +46,7 @@ ARABIC_NAMES = {
     "PHDC": "بالم هيلز", "GPPL": "الأهرام القابضة", "VLMR": "فالمور",
     "HRHO": "إي إف جي هيرميس", "EFID": "إديتا", "JUFO": "جهينة",
     "CANA": "بنك قناة السويس", "GBCO": "جي بي كورب", "OCDI": "سوديك",
-    "BTFH": "بلتون", "RAYA": "رايا القابضة", "IRON": "ال الحديد والصلب",
+    "BTFH": "بلتون", "RAYA": "رايا القابضة", "IRON": "ال حديد والصلب",
     "FERC": "فيركيم", "CIEB": "كريدي أجريكول", "FAIT": "بنك فيصل الإسلامي",
     "HELI": "مدينة هليوبوليس", "EGCH": "الكيماويات المصرية", "VALU": "فاليو",
     "EXPA": "بنك التنمية الصادرات", "CLHO": "مستشفيات كليوباترا", "ARCC": "أسمنت العربية",
@@ -87,13 +89,26 @@ ARABIC_NAMES = {
 # ─── Stock List Scraping ─────────────────────────────────────────────────────
 
 STOCKANALYSIS_URL = "https://stockanalysis.com/list/egyptian-stock-exchange/"
+FALLBACK_STOCKS_FILE = os.path.join(os.path.dirname(__file__), "egx_stocks.json")
+
+
+def _load_fallback_stock_list() -> list[dict]:
+    """Load the saved stock list as fallback when scraping fails."""
+    try:
+        with open(FALLBACK_STOCKS_FILE, "r", encoding="utf-8") as f:
+            stocks = json.load(f)
+            logger.info(f"Loaded {len(stocks)} stocks from fallback file.")
+            return stocks
+    except Exception as e:
+        logger.error(f"Failed to load fallback stock list: {e}")
+        return []
 
 
 def scrape_egx_stock_list() -> list[dict]:
     """
     Scrape the full list of all EGX stocks from stockanalysis.com.
+    Falls back to egx_stocks.json if scraping fails.
     Returns list of dicts with: symbol, name, price, change_pct, market_cap_str.
-    This gives us real-time current prices for all 224 stocks.
     """
     headers = {
         "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
@@ -105,18 +120,18 @@ def scrape_egx_stock_list() -> list[dict]:
         r.raise_for_status()
     except Exception as e:
         logger.error(f"Failed to scrape stockanalysis.com: {e}")
-        return []
+        return _load_fallback_stock_list()
 
     soup = BeautifulSoup(r.text, "html.parser")
     table = soup.find("table")
     if not table:
         logger.error("No table found on stockanalysis.com page")
-        return []
+        return _load_fallback_stock_list()
 
     tbody = table.find("tbody")
     if not tbody:
         logger.error("No tbody found in table")
-        return []
+        return _load_fallback_stock_list()
 
     stocks = []
     for row in tbody.find_all("tr"):
@@ -128,30 +143,33 @@ def scrape_egx_stock_list() -> list[dict]:
             change_str = cells[5].get_text(strip=True)
             market_cap_str = cells[3].get_text(strip=True) if len(cells) > 3 else ""
 
-            # Parse price
             try:
                 price = float(price_str.replace(",", ""))
             except (ValueError, TypeError):
                 price = 0.0
 
-            # Parse change %
             change_pct = 0.0
             try:
                 change_clean = change_str.replace("%", "").replace("+", "").strip()
-                change_pct = float(change_clean)
-                if change_str.strip().startswith("-"):
-                    change_pct = -change_pct
+                if change_clean and change_clean != "-":
+                    change_pct = float(change_clean)
+                    if change_str.strip().startswith("-"):
+                        change_pct = -change_pct
             except (ValueError, TypeError):
                 pass
 
             if symbol and symbol != "No.":
                 stocks.append({
-                    "symbol": symbol.replace(".CA", ""),  # Clean ticker
+                    "symbol": symbol.replace(".CA", ""),
                     "name": name,
                     "price": price,
                     "change_pct": change_pct,
                     "market_cap_str": market_cap_str,
                 })
+
+    if not stocks:
+        logger.warning("Scraping returned 0 stocks. Using fallback.")
+        return _load_fallback_stock_list()
 
     logger.info(f"Scraped {len(stocks)} EGX stocks from stockanalysis.com")
     return stocks
@@ -171,33 +189,44 @@ def _get_tv():
     return _tv_instance
 
 
-def download_stock_history(ticker: str, n_bars: int = 250) -> Optional[pd.DataFrame]:
+def download_stock_history(ticker: str, n_bars: int = 250, retries: int = 2) -> Optional[pd.DataFrame]:
     """
     Download historical OHLCV data from TradingView.
-    Returns DataFrame with capitalized column names (Open, High, Low, Close, Volume).
+    Includes retry logic with exponential backoff.
+    Returns DataFrame with capitalized column names.
     """
     from tvDatafeed import TvDatafeed, Interval
 
     tv = _get_tv()
-    try:
-        df = tv.get_hist(symbol=ticker, exchange="EGX", interval=Interval.in_daily, n_bars=n_bars)
-        if df is None or len(df) == 0:
-            return None
 
-        # Rename columns to match indicators.py expectations
-        df = df.rename(columns={
-            "open": "Open", "high": "High", "low": "Low",
-            "close": "Close", "volume": "Volume",
-        })
+    for attempt in range(retries + 1):
+        try:
+            df = tv.get_hist(symbol=ticker, exchange="EGX", interval=Interval.in_daily, n_bars=n_bars)
+            if df is not None and len(df) > 0:
+                df = df.rename(columns={
+                    "open": "Open", "high": "High", "low": "Low",
+                    "close": "Close", "volume": "Volume",
+                })
+                if "symbol" in df.columns:
+                    df = df.drop(columns=["symbol"])
+                return df
 
-        # Drop the symbol column if present
-        if "symbol" in df.columns:
-            df = df.drop(columns=["symbol"])
+            if attempt < retries:
+                logger.debug(f"  {ticker}: no data (attempt {attempt+1}), retrying…")
+                time.sleep(1 * (attempt + 1))
+            else:
+                return None
 
-        return df
-    except Exception as e:
-        logger.warning(f"TradingView download failed for {ticker}: {str(e)[:80]}")
-        return None
+        except Exception as e:
+            err_str = str(e)[:80]
+            if attempt < retries:
+                logger.debug(f"  {ticker}: {err_str} (attempt {attempt+1}), retrying…")
+                time.sleep(2 * (attempt + 1))
+            else:
+                logger.warning(f"TradingView download failed for {ticker} after {retries+1} attempts: {err_str}")
+                return None
+
+    return None
 
 
 # ─── Full Scan ───────────────────────────────────────────────────────────────
@@ -206,15 +235,14 @@ def scan_all_stocks() -> list[StockAnalysis]:
     """
     Full scan of all EGX stocks:
     1. Scrape stockanalysis.com for all 224 stocks with real-time prices
-    2. Download historical data from TradingView for each
+    2. Download historical data from TradingView for each (with retries)
     3. Calculate technical indicators
     4. Return sorted by composite score (most bullish first)
     """
-    # Step 1: Get the stock list with live prices
     stock_list = scrape_egx_stock_list()
 
     if not stock_list:
-        logger.error("No stocks scraped. Falling back to empty list.")
+        logger.error("No stocks available (scraping and fallback both failed).")
         return []
 
     total = len(stock_list)
@@ -234,13 +262,12 @@ def scan_all_stocks() -> list[StockAnalysis]:
         if i % 20 == 0:
             logger.info(f"Progress: {i}/{total} ({success_count} ok, {fail_count} failed)")
 
-        # Step 2: Download historical data from TradingView
-        df = download_stock_history(ticker, n_bars=250)
+        # Download historical data from TradingView (with retry)
+        df = download_stock_history(ticker, n_bars=250, retries=2)
 
         if df is None or len(df) < 50:
-            logger.debug(f"  ⚠️ {ticker}: insufficient data ({len(df) if df is not None else 0} bars), skipping indicators")
+            logger.debug(f"  ⚠️ {ticker}: insufficient data, skipping indicators")
             fail_count += 1
-            # Still include with live price but no indicators
             if live_price > 0:
                 analysis = StockAnalysis(
                     ticker=ticker,
@@ -249,16 +276,15 @@ def scan_all_stocks() -> list[StockAnalysis]:
                     current_price=live_price,
                     daily_change_pct=live_change,
                     volume=0,
-                    signal_label="لا توجد بيانات كافية ⚪",
                 )
                 results.append(analysis)
             continue
 
-        # Step 3: Calculate indicators
+        # Calculate indicators
         try:
             analysis = analyze_stock(df, ticker, name_en, name_ar)
 
-            # Override with live price from stockanalysis.com (more real-time)
+            # Override with live price from stockanalysis.com
             if live_price > 0:
                 analysis.current_price = live_price
                 analysis.daily_change_pct = live_change
@@ -266,13 +292,15 @@ def scan_all_stocks() -> list[StockAnalysis]:
             results.append(analysis)
             success_count += 1
 
-            logger.debug(f"  📊 {ticker}: score={analysis.composite_score} {analysis.signal_label}")
-
         except Exception as e:
             logger.warning(f"  ❌ {ticker}: analysis failed: {str(e)[:80]}")
             fail_count += 1
+            if live_price > 0:
+                results.append(StockAnalysis(
+                    ticker=ticker, name=name_en, name_ar=name_ar,
+                    current_price=live_price, daily_change_pct=live_change, volume=0,
+                ))
 
-        # Small delay to avoid rate limiting
         time.sleep(0.15)
 
     # Sort by composite score (most bullish first)
@@ -295,22 +323,24 @@ def get_top_bearish(stocks: list[StockAnalysis], top_n: int = 5) -> list[StockAn
     return bearish[:top_n]
 
 
-def format_analysis_for_ai(stocks: list[StockAnalysis]) -> str:
+def format_analysis_for_ai(stocks: list[StockAnalysis], market_text: str = "") -> str:
     """
     Format stock analysis data as text for Gemini AI.
-    To stay within free-tier token limits, only sends:
-    - Top 20 bullish stocks with full indicator details
-    - Top 10 bearish stocks with full indicator details
-    - Market-wide statistics summary
+    Includes market index context and top bullish/bearish stocks with full details.
+    Limited to top 20 bullish + top 10 bearish to stay within token limits.
     """
     lines = ["EGX STOCK TECHNICAL ANALYSIS REPORT", "=" * 50, ""]
 
-    # Only include stocks that actually have indicators
+    # Include market context if provided
+    if market_text:
+        lines.append("MARKET INDEX DATA:")
+        lines.append(market_text)
+        lines.append("")
+
     analyzed = [s for s in stocks if s.indicators]
     total_with_data = len(analyzed)
     total_all = len(stocks)
 
-    # Market stats
     bullish_count = sum(1 for s in analyzed if s.composite_score >= 2)
     bearish_count = sum(1 for s in analyzed if s.composite_score <= -2)
     neutral_count = total_with_data - bullish_count - bearish_count
@@ -320,7 +350,6 @@ def format_analysis_for_ai(stocks: list[StockAnalysis]) -> str:
     lines.append(f"Bullish: {bullish_count}, Bearish: {bearish_count}, Neutral: {neutral_count}")
     lines.append("")
 
-    # Top bullish — full details (limit to 20 to control token usage)
     top_bull = get_top_bullish(stocks, 20)
     lines.append("TOP BULLISH CANDIDATES (detailed):")
     lines.append("")
@@ -338,7 +367,6 @@ def format_analysis_for_ai(stocks: list[StockAnalysis]) -> str:
             lines.append(f"  Bullish reasons: {'; '.join(s.bullish_reasons)}")
         lines.append("")
 
-    # Top bearish — full details
     top_bear = get_top_bearish(stocks, 10)
     lines.append("TOP BEARISH CANDIDATES (detailed):")
     lines.append("")
@@ -357,10 +385,7 @@ def format_analysis_for_ai(stocks: list[StockAnalysis]) -> str:
 
 
 def format_analysis_for_telegram(stocks: list[StockAnalysis]) -> str:
-    """
-    Format stock analysis as a human-readable Telegram message section.
-    Used as fallback if Gemini AI is unavailable.
-    """
+    """Fallback Telegram formatting if Gemini AI is unavailable."""
     from ai_report import _escape_markdown
 
     lines = []
@@ -368,14 +393,13 @@ def format_analysis_for_telegram(stocks: list[StockAnalysis]) -> str:
     top_bear = get_top_bearish(stocks, 5)
 
     if top_bull:
-        lines.append("📊 *أقوى الأسهم صعودًا (بناءً على المؤشرات التقنية):*")
+        lines.append("📊 *أقوى الأسهم صعودًا:*")
         lines.append("")
         for i, s in enumerate(top_bull, 1):
             lines.append(f"{i}. *{_escape_markdown(s.name_ar)}* ({_escape_markdown(s.ticker)})")
-            lines.append(f"   السعر: {_escape_markdown(str(s.current_price))} | التغيير: {_escape_markdown(str(s.daily_change_pct))}%")
-            lines.append(f"   الإشارة: {_escape_markdown(s.signal_label)} | الثقة: {_escape_markdown(str(s.signal_score_pct))}%")
+            lines.append(f"   {_escape_markdown(str(s.current_price))} | {_escape_markdown(s.signal_label)}")
             if s.bullish_reasons:
-                lines.append(f"   الأسباب: {' / '.join(s.bullish_reasons[:3])}")
+                lines.append(f"   {' / '.join(s.bullish_reasons[:3])}")
             lines.append("")
 
     if top_bear:
@@ -383,17 +407,15 @@ def format_analysis_for_telegram(stocks: list[StockAnalysis]) -> str:
         lines.append("")
         for i, s in enumerate(top_bear, 1):
             lines.append(f"{i}. *{_escape_markdown(s.name_ar)}* ({_escape_markdown(s.ticker)})")
-            lines.append(f"   السعر: {_escape_markdown(str(s.current_price))} | الإشارة: {_escape_markdown(s.signal_label)}")
+            lines.append(f"   {_escape_markdown(str(s.current_price))} | {_escape_markdown(s.signal_label)}")
             if s.bearish_reasons:
-                lines.append(f"   الأسباب: {' / '.join(s.bearish_reasons[:2])}")
+                lines.append(f"   {' / '.join(s.bearish_reasons[:2])}")
             lines.append("")
 
     return "\n".join(lines)
 
 
 if __name__ == "__main__":
-    # Quick local test
-    import sys
     logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(message)s")
 
     print("=== Full EGX Stock Scan ===")

@@ -3,8 +3,6 @@ ai_report.py
 ------------
 Generates professional Arabic market analysis using Google Gemini (free tier).
 Requires GEMINI_API_KEY environment variable.
-
-No financial advice is given. Output is informational only.
 """
 
 import os
@@ -20,9 +18,8 @@ from stock_scanner import get_top_bullish, get_top_bearish
 
 logger = logging.getLogger(__name__)
 
-GEMINI_MODEL = "gemini-2.5-flash"  # Free tier, fast, supports Arabic
+GEMINI_MODEL = "gemini-2.5-flash"
 
-# Arabic day/month names
 ARABIC_DAYS = {
     "Monday": "الإثنين", "Tuesday": "الثلاثاء", "Wednesday": "الأربعاء",
     "Thursday": "الخميس", "Friday": "الجمعة", "Saturday": "السبت",
@@ -35,7 +32,6 @@ ARABIC_MONTHS = {
     "October": "أكتوبر", "November": "نوفمبر", "December": "ديسمبر",
 }
 
-# Professional system prompt for advanced technical analysis
 SYSTEM_PROMPT = """أنت محلل مالي تقني محترف متخصص في البورصة المصرية (EGX).
 خبرتك تشمل التحليل التقني المتقدم باستخدام:
 - مؤشر القوة النسبية RSI
@@ -66,15 +62,27 @@ SYSTEM_PROMPT = """أنت محلل مالي تقني محترف متخصص في 
 - أضف قسمًا للأسهم الهابطة (تحذير).
 """
 
-# Telegram Markdown special chars that need escaping
-MARKDOWN_SPECIAL = re.compile(r"([_*\[\]`(){}~#>!\-])")
+# Telegram Markdown V1 — only these chars need escaping
+_MARKDOWN_V1_SPECIAL = re.compile(r"([*_`\[])")
 
 
 def _escape_markdown(text: str) -> str:
-    """Escape Markdown special characters for Telegram."""
+    """Escape only Markdown V1 special characters for Telegram."""
     if not text:
         return text
-    return MARKDOWN_SPECIAL.sub(r"\\\1", text)
+    return _MARKDOWN_V1_SPECIAL.sub(r"\\\1", text)
+
+
+def _safe_truncate(text: str, max_len: int) -> str:
+    """Truncate at a safe boundary (last newline before max_len) to avoid breaking markdown."""
+    if len(text) <= max_len:
+        return text
+    # Find the last newline before max_len
+    truncated = text[:max_len]
+    last_nl = truncated.rfind("\n")
+    if last_nl > max_len - 200:  # Only use newline if it's reasonably close
+        return text[:last_nl] + "\n…"
+    return truncated + "…"
 
 
 def _format_arabic_date() -> str:
@@ -95,7 +103,7 @@ def _format_arabic_date() -> str:
 def generate_arabic_report(market_text: str) -> str:
     """
     Takes raw market/stock data as text and returns a professional Arabic report.
-    Includes retry logic and graceful fallback.
+    Includes retry logic with 429 rate-limit handling and graceful fallback.
     """
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
@@ -106,7 +114,6 @@ def generate_arabic_report(market_text: str) -> str:
 
     genai.configure(api_key=api_key)
 
-    # Configure safety settings — allow financial discussion
     safety_settings = {
         "harassment": "block_none",
         "hate_speech": "block_none",
@@ -134,12 +141,12 @@ def generate_arabic_report(market_text: str) -> str:
 اجعل التقرير مختصرًا ومناسبًا للقراءة على الهاتف المحمول.
 """
 
-    max_retries = 2
+    max_retries = 3
     for attempt in range(max_retries + 1):
         try:
             response = model.generate_content(
                 user_prompt,
-                request_options={"timeout": 60},  # 60 second timeout for larger input
+                request_options={"timeout": 90},
             )
             if response.text:
                 return response.text.strip()
@@ -149,14 +156,20 @@ def generate_arabic_report(market_text: str) -> str:
                     time.sleep(2 ** attempt)
                     continue
         except Exception as e:
-            logger.error(f"Gemini API error (attempt {attempt + 1}): {e}")
+            err_str = str(e).lower()
+            logger.error(f"Gemini API error (attempt {attempt + 1}/{max_retries + 1}): {e}")
+            # 429 rate limit — wait longer
+            if "429" in err_str or "rate" in err_str or "quota" in err_str:
+                wait = 30 * (attempt + 1)
+                logger.warning(f"Rate limited. Waiting {wait}s before retry…")
+                time.sleep(wait)
+                continue
             if attempt < max_retries:
                 time.sleep(2 ** attempt)
                 continue
 
-    # Fallback — return raw data summary without AI
     logger.warning("All Gemini attempts failed. Returning fallback summary.")
-    return "⚠️ تعذّر إنشاء التحليل الذكي في الوقت الحالي.\n\n" + market_text
+    return "⚠️ تعذّر إنشاء التحليل الذكي في الوقت الحالي.\n\n" + market_text[:2000]
 
 
 def build_telegram_message(
@@ -165,27 +178,17 @@ def build_telegram_message(
     market_summary=None,
 ) -> str:
     """
-    Assemble the full professional Telegram-formatted message with:
-    - Header with date
-    - EGX 30 index overview (if available)
-    - AI-generated professional analysis
-    - Top bullish stocks table
-    - Top bearish stocks table
-    - Technical indicators summary for top picks
-    
-    Handles Telegram's 4096 character limit (splits into multiple messages if needed).
-    Returns the first message; additional messages can be sent separately.
+    Assemble the full professional Telegram-formatted message.
+    Handles Telegram's 4096 character limit with safe truncation.
     """
     date_str = _format_arabic_date()
 
-    # Build header
     lines = [
         "🇪🇬 *تقرير البورصة المصرية التقني الاحترافي*",
         f"📅 {date_str}",
         "",
     ]
 
-    # EGX 30 index overview if available
     if market_summary:
         arrow = (
             "📈" if market_summary.direction == "up"
@@ -202,7 +205,6 @@ def build_telegram_message(
             lines.append(f"*الأداء السنوي:* {_escape_markdown(str(market_summary.year_change_pct))}")
         lines.append("")
 
-    # Stats summary
     total_stocks = len(stocks)
     bullish_count = sum(1 for s in stocks if s.composite_score >= 2)
     bearish_count = sum(1 for s in stocks if s.composite_score <= -2)
@@ -220,13 +222,10 @@ def build_telegram_message(
     ]
 
     message = "\n".join(lines)
+    message = _safe_truncate(message, 3800)
 
-    # Check if we need to split
     if len(message) > 3800:
-        # Split: send header + AI summary as first message
-        # Stocks tables will be separate messages
-        message = message[:3790] + "\n…\n"
-        logger.info("Message split: header + AI summary (stocks table in separate message)")
+        logger.info("Main message truncated to fit Telegram limit.")
 
     return message
 
@@ -234,7 +233,6 @@ def build_telegram_message(
 def build_stocks_table_message(stocks: list[StockAnalysis]) -> str:
     """
     Build a separate message with detailed stock tables (top bullish + bearish).
-    Uses regular Markdown (not V2) for simpler escaping.
     Sent as a second message after the main report.
     """
     lines = ["📊 *تفاصيل الأسهم المرشحة*", ""]
@@ -282,25 +280,33 @@ def build_stocks_table_message(stocks: list[StockAnalysis]) -> str:
     ]
 
     message = "\n".join(lines)
-
-    if len(message) > 4096:
-        message = message[:4090] + "\n…\n"
-        logger.warning("Stocks table message truncated to fit 4096 char limit.")
+    message = _safe_truncate(message, 4000)
 
     return message
 
+
 if __name__ == "__main__":
-    # Quick local test
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(message)s")
     from stock_scanner import scan_all_stocks, format_analysis_for_ai
+    from fetch_egx import build_market_summary, format_summary_text
 
     print("Scanning stocks...")
     stocks = scan_all_stocks()
-    print(f"\nAnalyzed {len(stocks)} stocks\n")
+    print(f"Analyzed {len(stocks)} stocks")
 
-    for s in stocks[:5]:
-        print(f"  {s.name_ar} ({s.ticker}): {s.signal_label} (score={s.composite_score})")
+    market = build_market_summary()
+    market_text = format_summary_text(market)
+    full_text = market_text + "\n\n" + format_analysis_for_ai(stocks)
 
-    print("\n=== AI Report ===")
-    text = format_analysis_for_ai(stocks)
-    report = generate_arabic_report(text)
-    print(report)
+    print("Generating AI report...")
+    report = generate_arabic_report(full_text)
+
+    msg1 = build_telegram_message(report, stocks, market)
+    msg2 = build_stocks_table_message(stocks)
+
+    print("\n=== MAIN MESSAGE ===")
+    print(msg1)
+    print(f"\n({len(msg1)} chars)")
+    print("\n=== STOCKS TABLE ===")
+    print(msg2)
+    print(f"\n({len(msg2)} chars)")
