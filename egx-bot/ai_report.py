@@ -1,8 +1,13 @@
 """
 ai_report.py
 ------------
-Generates professional Arabic market analysis using Google Gemini (free tier).
-Requires GEMINI_API_KEY environment variable.
+AI Explanation Layer for EGX market analysis.
+
+CRITICAL: AI ONLY explains already-computed results.
+- AI never generates prices, scores, or technical values.
+- AI never fabricates stock names or fundamentals.
+- AI only summarizes and explains the computed data in Arabic.
+- If data is missing or poor quality, AI says so honestly.
 """
 
 import os
@@ -14,7 +19,6 @@ import pytz
 import google.generativeai as genai
 
 from indicators import StockAnalysis
-from stock_scanner import get_top_bullish, get_top_bearish
 
 logger = logging.getLogger(__name__)
 
@@ -32,37 +36,26 @@ ARABIC_MONTHS = {
     "October": "أكتوبر", "November": "نوفمبر", "December": "ديسمبر",
 }
 
-SYSTEM_PROMPT = """أنت محلل مالي تقني محترف متخصص في البورصة المصرية (EGX).
-خبرتك تشمل التحليل التقني المتقدم باستخدام:
-- مؤشر القوة النسبية RSI
-- مؤشر الاستوكاستك Stochastic
-- ماكد MACD
-- بولينجر باند Bollinger Bands
-- المتوسطات المتحركة SMA (20، 50، 200)
-- مؤشر الاتجاه ADX
-- مؤشر التوازن الحجمي OBV
-- ويليامز %R
-- فوليوم بروفايل Volume Profile
-- متوسط المدى الحقيقي ATR
+# Strict prompt: AI explains computed data, never generates numbers
+SYSTEM_PROMPT = """أنت محلل مالي تقني متخصص في البورصة المصرية (EGX).
 
-مهمتك:
-1. تحليل البيانات التقنية لأسهم البورصة المصرية
-2. تحديد الأسهم الأكثر احتمالية للصعود بناءً على تقاطع المؤشرات
-3. تقديم تبرير تقني واضح لكل توصية
-4. تحديد مستويات الدعم والمقاومة
+مهمتك الوحيدة هي شرح وتوضيح البيانات التقنية المحسوبة مسبقًا باللغة العربية.
+كل الأرقام والمؤشرات والدرجات والتوصيات تم حسابها برمجيًا — دورك هو شرحها فقط.
 
-القواعد الصارمة:
-- لا تقدم نصائح استثمارية شخصية أبدًا.
-- لا تضمن أرباحًا أو تتوقع نتائج مؤكدة.
-- استخدم صيغة "الأسهم المرشحة للصعود" بدلاً من "أسهم ستصعد".
+قواعد صارمة:
+- لا ت invent أو تخترع أي أرقام، أسعار، أو قيم مؤشرات.
+- لا تذكر سعرًا أو درجة لم يرد في البيانات المقدمة لك.
+- استخدم فقط الأرقام الموجودة في البيانات.
+- اشرح سبب كل توصية بناءً على المؤشرات المذكورة.
+- اذكر المخاطر بوضوح.
 - استخدم لغة عربية واضحة ومهنية.
-- لا تستخدم رموز Markdown مثل * أو _ أو [ في النص العادي.
-- التقرير يجب أن يكون منظمًا ومناسبًا للقراءة على الهاتف.
-- لكل سهم مرشح للصعود: اذكر اسم السهم، السعر الحالي، السبب التقني الرئيسي، ومستوى الدعم/المقاومة.
-- أضف قسمًا للأسهم الهابطة (تحذير).
+- لا تستخدم رموز Markdown.
+- التقرير يجب أن يكون مناسبًا للقراءة على الهاتف.
+- إذا كانت البيانات غير كافية، قل ذلك بصراحة.
+- لا تقدم نصائح استثمارية شخصية.
+- استخدم صيغة "الأسهم المرشحة" بدلاً من "أسهم ستصعد".
 """
 
-# Telegram Markdown V1 — only these chars need escaping
 _MARKDOWN_V1_SPECIAL = re.compile(r"([*_`\[])")
 
 
@@ -74,43 +67,33 @@ def _escape_markdown(text: str) -> str:
 
 
 def _safe_truncate(text: str, max_len: int) -> str:
-    """Truncate at a safe boundary (last newline before max_len) to avoid breaking markdown."""
+    """Truncate at a safe boundary (last newline before max_len)."""
     if len(text) <= max_len:
         return text
-    # Find the last newline before max_len
     truncated = text[:max_len]
     last_nl = truncated.rfind("\n")
-    if last_nl > max_len - 200:  # Only use newline if it's reasonably close
+    if last_nl > max_len - 200:
         return text[:last_nl] + "\n…"
     return truncated + "…"
 
 
 def _format_arabic_date() -> str:
-    """Return today's date in Arabic (e.g. 'الأحد، 28 يونيو 2026')."""
+    """Return today's date in Arabic."""
     cairo_tz = pytz.timezone("Africa/Cairo")
     now = datetime.now(cairo_tz)
-    day_en = now.strftime("%A")
-    month_en = now.strftime("%B")
-    day_num = now.day
-    year = now.year
-
-    day_ar = ARABIC_DAYS.get(day_en, day_en)
-    month_ar = ARABIC_MONTHS.get(month_en, month_en)
-
-    return f"{day_ar}، {day_num} {month_ar} {year}"
+    day_ar = ARABIC_DAYS.get(now.strftime("%A"), "")
+    month_ar = ARABIC_MONTHS.get(now.strftime("%B"), "")
+    return f"{day_ar}، {now.day} {month_ar} {now.year}"
 
 
-def generate_arabic_report(market_text: str) -> str:
+def explain_analysis(computed_data: str) -> str:
     """
-    Takes raw market/stock data as text and returns a professional Arabic report.
-    Includes retry logic with 429 rate-limit handling and graceful fallback.
+    Use AI to EXPLAIN already-computed technical analysis data.
+    AI does NOT generate any numbers — it only summarizes what's provided.
     """
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
-        raise EnvironmentError(
-            "GEMINI_API_KEY environment variable is not set. "
-            "Get your free key from https://aistudio.google.com/app/apikey"
-        )
+        raise EnvironmentError("GEMINI_API_KEY not set.")
 
     genai.configure(api_key=api_key)
 
@@ -128,161 +111,231 @@ def generate_arabic_report(market_text: str) -> str:
     )
 
     user_prompt = f"""
-بناءً على البيانات التقنية التالية لأسهم البورصة المصرية،
-اكتب تقريرًا تحليليًا احترافيًا باللغة العربية:
+فيما يلي بيانات تقنية محسوبة لأسهم البورصة المصرية.
+اكتب تقريرًا بالعربية يشرح هذه البيانات:
 
-{market_text}
+{computed_data}
 
-التقرير يجب أن يحتوي على:
-1. مقدمة موجزة عن حالة السوق العامة
-2. قائمة بالأسهم المرشحة للصعود (أعلى 5-10 أسهم) مع التبرير التقني لكل سهم
-3. قائمة بالأسهم المرشحة للهبوط (أعلى 3-5 أسهم، تحذير) مع السبب
+التقرير يجب أن:
+1. يبدأ بملخص قصير عن حالة السوق العامة
+2. يشرح أبرز الأسهم المرشحة للصعود مع ذكر الأسباب التقنية
+3. يحذر من الأسهم الهابطة
+4. يذكر المخاطر بوضوح
+5. يذكر أن هذه ليست نصيحة استثمارية
 
-اجعل التقرير مختصرًا ومناسبًا للقراءة على الهاتف المحمول.
+مهم: استخدم فقط الأرقام والبيانات المذكورة أعلاه. لا تخترع أي أرقام جديدة.
 """
 
     max_retries = 3
     for attempt in range(max_retries + 1):
         try:
-            response = model.generate_content(
-                user_prompt,
-                request_options={"timeout": 90},
-            )
+            response = model.generate_content(user_prompt, request_options={"timeout": 90})
             if response.text:
                 return response.text.strip()
-            else:
-                logger.warning("Gemini returned empty response")
-                if attempt < max_retries:
-                    time.sleep(2 ** attempt)
-                    continue
+            if attempt < max_retries:
+                time.sleep(2 ** attempt)
         except Exception as e:
             err_str = str(e).lower()
-            logger.error(f"Gemini API error (attempt {attempt + 1}/{max_retries + 1}): {e}")
-            # 429 rate limit — wait longer
+            logger.error(f"Gemini error (attempt {attempt+1}): {e}")
             if "429" in err_str or "rate" in err_str or "quota" in err_str:
                 wait = 30 * (attempt + 1)
-                logger.warning(f"Rate limited. Waiting {wait}s before retry…")
+                logger.warning(f"Rate limited. Waiting {wait}s…")
                 time.sleep(wait)
                 continue
             if attempt < max_retries:
                 time.sleep(2 ** attempt)
-                continue
 
-    logger.warning("All Gemini attempts failed. Returning fallback summary.")
-    return "⚠️ تعذّر إنشاء التحليل الذكي في الوقت الحالي.\n\n" + market_text[:2000]
+    logger.warning("All Gemini attempts failed. Returning computed data as-is.")
+    return computed_data[:2000]
 
+
+# Backward-compatible alias
+generate_arabic_report = explain_analysis
+
+
+# ─── Telegram Message Builders ───────────────────────────────────────────────
 
 def build_telegram_message(
     ai_summary: str,
     stocks: list[StockAnalysis],
     market_summary=None,
 ) -> str:
-    """
-    Assemble the full professional Telegram-formatted message.
-    Handles Telegram's 4096 character limit with safe truncation.
-    """
+    """Assemble the full professional Telegram message with scoring data."""
     date_str = _format_arabic_date()
 
     lines = [
-        "🇪🇬 *تقرير البورصة المصرية التقني الاحترافي*",
+        "🇪🇬 *تقرير البورصة المصرية التقني*",
         f"📅 {date_str}",
         "",
     ]
 
     if market_summary:
-        arrow = (
-            "📈" if market_summary.direction == "up"
-            else ("📉" if market_summary.direction == "down" else "➡️")
-        )
+        arrow = "📈" if market_summary.direction == "up" else ("📉" if market_summary.direction == "down" else "➡️")
         lines += [
             f"*مؤشر EGX 30:* {_escape_markdown(str(market_summary.current_value))} {arrow}",
-            f"*التغيير اليومي:* {_escape_markdown(str(market_summary.change))} "
-            f"({_escape_markdown(str(market_summary.change_pct))})",
+            f"*التغيير:* {_escape_markdown(str(market_summary.change))} ({_escape_markdown(str(market_summary.change_pct))})",
         ]
         if market_summary.month_change_pct:
-            lines.append(f"*الأداء الشهري:* {_escape_markdown(str(market_summary.month_change_pct))}")
+            lines.append(f"*شهري:* {_escape_markdown(str(market_summary.month_change_pct))}")
         if market_summary.year_change_pct:
-            lines.append(f"*الأداء السنوي:* {_escape_markdown(str(market_summary.year_change_pct))}")
+            lines.append(f"*سنوي:* {_escape_markdown(str(market_summary.year_change_pct))}")
         lines.append("")
 
-    total_stocks = len(stocks)
-    bullish_count = sum(1 for s in stocks if s.composite_score >= 2)
-    bearish_count = sum(1 for s in stocks if s.composite_score <= -2)
-    neutral_count = total_stocks - bullish_count - bearish_count
+    # Score-based summary
+    analyzed = [s for s in stocks if hasattr(s, 'scoring_result') and s.data_quality >= 0.5]
+    buy_count = sum(1 for s in analyzed if s.scoring_result.recommendation == "Buy")
+    watch_count = sum(1 for s in analyzed if s.scoring_result.recommendation == "Watch")
+    sell_count = sum(1 for s in analyzed if s.scoring_result.recommendation == "Sell")
+    no_trade = len(analyzed) - buy_count - watch_count - sell_count
 
     lines += [
-        f"📊 *ملخص المسح التقني:* {total_stocks} سهم",
-        f"🟢 صاعدة: {bullish_count} | 🔴 هابطة: {bearish_count} | 🟡 محايدة: {neutral_count}",
+        f"📊 *الملخص:* {len(analyzed)} سهم محلل",
+        f"🟢 شراء: {buy_count} | 🟡 مراقبة: {watch_count} | 🔴 بيع: {sell_count} | ⚪ لا تداول: {no_trade}",
         "",
         "─────────────────────",
         "",
-        "🤖 *التحليل التقني الاحترافي:*",
+        "🤖 *التحليل التقني:*",
         _escape_markdown(ai_summary),
         "",
     ]
 
-    message = "\n".join(lines)
-    message = _safe_truncate(message, 3800)
-
-    if len(message) > 3800:
-        logger.info("Main message truncated to fit Telegram limit.")
-
-    return message
+    return _safe_truncate("\n".join(lines), 3800)
 
 
 def build_stocks_table_message(stocks: list[StockAnalysis]) -> str:
-    """
-    Build a separate message with detailed stock tables (top bullish + bearish).
-    Sent as a second message after the main report.
-    """
-    lines = ["📊 *تفاصيل الأسهم المرشحة*", ""]
+    """Detailed stock table with scores, signals, and data freshness."""
+    lines = ["📊 *تفاصيل الأسهم — درجات وتوصيات*", ""]
 
-    top_bull = get_top_bullish(stocks, 10)
-    top_bear = get_top_bearish(stocks, 5)
+    # Get scored stocks sorted by score
+    scored = [s for s in stocks if hasattr(s, 'scoring_result') and s.data_quality >= 0.5]
+    scored.sort(key=lambda x: x.scoring_result.total_score, reverse=True)
 
-    if top_bull:
-        lines.append("🟢 *الأسهم المرشحة للصعود:*")
+    top_buy = [s for s in scored if s.scoring_result.recommendation == "Buy"][:10]
+    top_watch = [s for s in scored if s.scoring_result.recommendation == "Watch"][:5]
+    top_sell = [s for s in scored if s.scoring_result.recommendation == "Sell"][:5]
+
+    if not top_buy and not top_watch and not top_sell:
+        lines.append("⚪ لا توجد فرص تداول مؤكدة اليوم.")
+        lines.append("البيانات غير كافية أو الإشارات غير واضحة.")
         lines.append("")
-        for i, s in enumerate(top_bull, 1):
-            ticker_clean = s.ticker.replace(".CA", "")
-            lines.append(f"{i}. *{_escape_markdown(s.name_ar)}* ({_escape_markdown(ticker_clean)})")
-            lines.append(
-                f"   السعر: {_escape_markdown(str(s.current_price))} "
-                f"| التغيير: {_escape_markdown(str(s.daily_change_pct))}%"
-            )
-            lines.append(
-                f"   الإشارة: {_escape_markdown(s.signal_label)} "
-                f"| الثقة: {_escape_markdown(str(s.signal_score_pct))}%"
-            )
-            if s.bullish_reasons:
-                for reason in s.bullish_reasons[:3]:
-                    lines.append(f"   ✅ {_escape_markdown(reason)}")
+        lines.append("─────────────────────")
+        return "\n".join(lines)
+
+    if top_buy:
+        lines.append("🟢 *شراء (درجة 70+):*")
+        lines.append("")
+        for i, s in enumerate(top_buy, 1):
+            sr = s.scoring_result
+            lines.append(f"{i}. *{_escape_markdown(s.name_ar)}* ({_escape_markdown(s.ticker)})")
+            lines.append(f"   السعر: {_escape_markdown(str(s.current_price))} | درجة: {sr.total_score}/100")
+            lines.append(f"   المخاطرة: {_escape_markdown(sr.risk_level)} | البيانات: {_escape_markdown(sr.data_freshness)}")
+            if sr.pass_reasons:
+                lines.append(f"   ✅ {_escape_markdown(sr.pass_reasons[0])}")
+            if s.support > 0:
+                lines.append(f"   📌 دعم: {s.support} | مقاومة: {s.resistance}")
             lines.append("")
 
-    if top_bear:
-        lines.append("🔴 *الأسهم المرشحة للهبوط (تحذير):*")
+    if top_watch:
+        lines.append("🟡 *مراقبة (درجة 50-69):*")
         lines.append("")
-        for i, s in enumerate(top_bear, 1):
-            ticker_clean = s.ticker.replace(".CA", "")
-            lines.append(f"{i}. *{_escape_markdown(s.name_ar)}* ({_escape_markdown(ticker_clean)})")
-            lines.append(
-                f"   السعر: {_escape_markdown(str(s.current_price))} "
-                f"| الإشارة: {_escape_markdown(s.signal_label)}"
-            )
-            if s.bearish_reasons:
-                for reason in s.bearish_reasons[:2]:
-                    lines.append(f"   ⚠️ {_escape_markdown(reason)}")
+        for i, s in enumerate(top_watch, 1):
+            sr = s.scoring_result
+            lines.append(f"{i}. *{_escape_markdown(s.name_ar)}* ({_escape_markdown(s.ticker)})")
+            lines.append(f"   السعر: {_escape_markdown(str(s.current_price))} | درجة: {sr.total_score}/100")
+            if sr.pass_reasons:
+                lines.append(f"   👀 {_escape_markdown(sr.pass_reasons[0])}")
+            lines.append("")
+
+    if top_sell:
+        lines.append("🔴 *بيع (درجة 30 أو أقل):*")
+        lines.append("")
+        for i, s in enumerate(top_sell, 1):
+            sr = s.scoring_result
+            lines.append(f"{i}. *{_escape_markdown(s.name_ar)}* ({_escape_markdown(s.ticker)})")
+            lines.append(f"   السعر: {_escape_markdown(str(s.current_price))} | درجة: {sr.total_score}/100")
+            if sr.fail_reasons:
+                lines.append(f"   ⚠️ {_escape_markdown(sr.fail_reasons[0])}")
             lines.append("")
 
     lines += [
         "─────────────────────",
         "🔗 المصادر: TradingView | stockanalysis.com",
+        "⏰ البيانات قد تتأخر — تأكد قبل اتخاذ أي قرار",
     ]
 
-    message = "\n".join(lines)
-    message = _safe_truncate(message, 4000)
+    return _safe_truncate("\n".join(lines), 4000)
 
-    return message
+
+def format_stock_detail(stock: StockAnalysis) -> str:
+    """Format a single stock's full analysis for /stock command."""
+    from stock_scanner import get_arabic_name
+    from data.symbols import get_arabic_name as _gan
+
+    lines = [
+        f"📊 *{_escape_markdown(stock.name_ar)}* ({_escape_markdown(stock.ticker)})",
+        "",
+        f"💰 السعر: {_escape_markdown(str(stock.current_price))} EGP",
+        f"📈 التغيير: {_escape_markdown(str(stock.daily_change_pct))}%",
+        f"📦 الحجم: {stock.volume:,}",
+        "",
+    ]
+
+    if hasattr(stock, 'scoring_result'):
+        sr = stock.scoring_result
+        lines += [
+            f"🎯 الدرجة: *{sr.total_score}/100*",
+            f"📋 التوصية: {sr.recommendation_ar}",
+            f"⚠️ المخاطرة: {_escape_markdown(sr.risk_level)} — {_escape_markdown(sr.risk_reason)}",
+            f"🔄 البيانات: {_escape_markdown(sr.data_freshness)} (جودة: {sr.data_quality:.0%})",
+            "",
+        ]
+
+        if sr.pass_reasons:
+            lines.append("✅ *عوامل إيجابية:*")
+            for r in sr.pass_reasons[:4]:
+                lines.append(f"   • {_escape_markdown(r)}")
+            lines.append("")
+
+        if sr.fail_reasons:
+            lines.append("❌ *عوامل سلبية:*")
+            for r in sr.fail_reasons[:4]:
+                lines.append(f"   • {_escape_markdown(r)}")
+            lines.append("")
+
+    if stock.support > 0 or stock.resistance > 0:
+        lines.append("📌 *المستويات:*")
+        if stock.support > 0:
+            lines.append(f"   دعم: {stock.support}")
+        if stock.resistance > 0:
+            lines.append(f"   مقاومة: {stock.resistance}")
+        if stock.risk_reward_ratio > 0:
+            lines.append(f"   نسبة مخاطرة/عائد: {stock.risk_reward_ratio:.1f}:1")
+        lines.append("")
+
+    if stock.indicators:
+        lines.append("🔬 *المؤشرات التقنية:*")
+        for ind in stock.indicators:
+            lines.append(f"   {ind.name_ar}: {ind.value} ({ind.signal_text}) — {ind.note}")
+        lines.append("")
+
+    if stock.bullish_reasons:
+        lines.append("🟢 *أسباب الصعود:*")
+        for r in stock.bullish_reasons[:4]:
+            lines.append(f"   • {_escape_markdown(r)}")
+        lines.append("")
+
+    if stock.bearish_reasons:
+        lines.append("🔴 *أسباب الهبوط:*")
+        for r in stock.bearish_reasons[:4]:
+            lines.append(f"   • {_escape_markdown(r)}")
+        lines.append("")
+
+    lines += [
+        "─────────────────────",
+        "🔗 المصدر: TradingView + stockanalysis.com",
+    ]
+
+    return _safe_truncate("\n".join(lines), 4000)
 
 
 if __name__ == "__main__":
@@ -295,18 +348,16 @@ if __name__ == "__main__":
     print(f"Analyzed {len(stocks)} stocks")
 
     market = build_market_summary()
-    market_text = format_summary_text(market)
-    full_text = market_text + "\n\n" + format_analysis_for_ai(stocks)
+    market_text = format_summary_text(market) if market else ""
+    full_text = market_text + "\n\n" + format_analysis_for_ai(stocks, market_text)
 
-    print("Generating AI report...")
-    report = generate_arabic_report(full_text)
+    print("Generating AI explanation...")
+    report = explain_analysis(full_text)
 
     msg1 = build_telegram_message(report, stocks, market)
     msg2 = build_stocks_table_message(stocks)
 
-    print("\n=== MAIN MESSAGE ===")
-    print(msg1)
-    print(f"\n({len(msg1)} chars)")
-    print("\n=== STOCKS TABLE ===")
-    print(msg2)
-    print(f"\n({len(msg2)} chars)")
+    print(f"\n=== MAIN MESSAGE ({len(msg1)} chars) ===")
+    print(msg1[:500])
+    print(f"\n=== STOCKS TABLE ({len(msg2)} chars) ===")
+    print(msg2[:500])

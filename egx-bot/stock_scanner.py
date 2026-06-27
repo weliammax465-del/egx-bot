@@ -1,20 +1,15 @@
 """
 stock_scanner.py
 ----------------
-Scans ALL EGX stocks (224+) with real-time prices and professional technical analysis.
+Scans ALL EGX stocks with real-time prices and professional technical analysis.
 
-Data sources:
-  1. stockanalysis.com — scraped for the full list of all EGX stocks with 
-     current prices and daily changes (real-time data)
-  2. TradingView (tvdatafeed) — historical OHLCV data for technical indicators
-  3. egx_stocks.json — fallback stock list if scraping fails
-
-The scanner:
-  - Scrapes the full EGX stock list with live prices
-  - Downloads 250 days of historical data per stock from TradingView
-  - Calculates 9+ technical indicators per stock
-  - Ranks stocks by composite bullish/bearish score
-  - Returns the top candidates for the AI report
+Pipeline:
+  1. Data Collection: Scrape stockanalysis.com → fallback to egx_stocks.json
+  2. Data Validation: Validate symbols, prices, OHLCV data
+  3. Historical Data: Download from TradingView (with retries)
+  4. Technical Analysis: Compute 15+ indicators
+  5. Scoring: Deterministic 0-100 score with recommendation
+  6. Ranking: Sort by score, filter for quality
 """
 
 from __future__ import annotations
@@ -31,69 +26,20 @@ import requests
 from bs4 import BeautifulSoup
 
 from indicators import StockAnalysis, analyze_stock
+from scoring import compute_score, ScoringResult
+from data.symbols import normalize_symbol, is_valid_egx_symbol, get_arabic_name, validate_stock_entry, update_canonical_list
+from data.validator import validate_ohlcv, validate_price, validate_change_pct, deduplicate_stocks, check_data_freshness
 
 logger = logging.getLogger(__name__)
-
-# ─── Arabic Names for Major EGX Stocks ───────────────────────────────────────
-
-ARABIC_NAMES = {
-    "COMI": "البنك التجاري الدولي", "TMGH": "طلعت مصطفى", "SWDY": "السويدي إليكتريك",
-    "ETEL": "المصرية للاتصالات", "EGAL": "مصر للألمنيوم", "EAST": "الشرقية للدخان",
-    "QNBE": "بنك قطر الوطني", "MFPC": "مصر للأسمدة", "ABUK": "أبو قير للأسمدة",
-    "HDBK": "بنك الإسكان والتعمير", "ALCN": "الإسكندرية للحاويات", "ORAS": "أوراسكوم للإنشاء",
-    "EFIH": "إي فاينانس", "ADIB": "بنك أبوظبي الإسلامي", "EMFD": "عمار مصر",
-    "FWRY": "فوري", "SCTS": "قناة السويس للتكنولوجيا", "ORHD": "أوراسكوم للتنمية",
-    "PHDC": "بالم هيلز", "GPPL": "الأهرام القابضة", "VLMR": "فالمور",
-    "HRHO": "إي إف جي هيرميس", "EFID": "إديتا", "JUFO": "جهينة",
-    "CANA": "بنك قناة السويس", "GBCO": "جي بي كورب", "OCDI": "سوديك",
-    "BTFH": "بلتون", "RAYA": "رايا القابضة", "IRON": "ال حديد والصلب",
-    "FERC": "فيركيم", "CIEB": "كريدي أجريكول", "FAIT": "بنك فيصل الإسلامي",
-    "HELI": "مدينة هليوبوليس", "EGCH": "الكيماويات المصرية", "VALU": "فاليو",
-    "EXPA": "بنك التنمية الصادرات", "CLHO": "مستشفيات كليوباترا", "ARCC": "أسمنت العربية",
-    "CCAP": "قالا", "TAQA": "طاقة", "EFIC": "الصناعات المالية والصناعية",
-    "POUL": "دواجن القاهرة", "SKPC": "سيدي كرير", "EGTS": "المنتجعات المصرية",
-    "MTIE": "مجموعة أم أم", "CIRA": "سيرا للتعليم", "SCEM": "أسمنت سيناء",
-    "EGSA": "نايل سات", "MCQE": "أسمنت قنا", "SAUD": "بنك البركة",
-    "ORWE": "نسج الشرق", "MASR": "مدينة مصر", "PHAR": "إيبيكو",
-    "UBEE": "البنك المتحد", "MHOT": "فنادق مصر", "MBSC": "أسمنت بني سويف",
-    "ISPH": "ابن سينا فارما", "CICH": "سي آي كابيتال", "EGBE": "بنك الخليج",
-    "TALM": "تعليم", "ATQA": "عتاقة للصلب", "MOIL": "ماريدايف",
-    "BINV": "استثمارات ب", "RMDA": "راميدا", "AMOC": "العامة للبترول",
-    "IFAP": "المحاصيل الزراعية", "CSAG": "وكالات الشحن بالقناة", "OLFI": "أوبور لاند",
-    "ISMQ": "مناجم الحديد", "BONY": "بنيان", "NIPH": "نايل فارما",
-    "DOMT": "دومتي", "MIPH": "مينافارم", "KORA": "كورة للطاقة",
-    "OIH": "أوراسكوم للاستثمار", "PRDC": "رواد العقارية", "MPRC": "مدينة الإنتاج",
-    "EGAS": "غاز مصر", "ELEC": "كابلات مصر", "SUGR": "سكر الدلتا",
-    "ZMID": "الزهراء المعادي", "ACAP": "أيه كابيتال", "AMES": "مركز الإسكندرية الطبي",
-    "MOIN": "مهندس للتأمين", "BIOC": "جلاكسو", "PHTV": "بيراميزا",
-    "NAPR": "الطباعة الوطنية", "CNFN": "كونتاكت", "CPCI": "كحيرة للأدوية",
-    "AXPH": "الإسكندرية للأدوية", "NINH": "مستشفى النزهة", "MPCI": "ممفيس للأدوية",
-    "ENGC": "آيكون", "GOUR": "جورميه", "SPIN": "الغزل والنسيج",
-    "DSCW": "دايس", "MFSC": "محلات مصر الحرة", "SVCE": "أسمنت وادي النيل",
-    "AMIA": "عرب ملتقى", "GSSC": "الصوامع العامة", "GDWA": "جدوة",
-    "OCPH": "أكتوبر فارما", "MICH": "الكيماويات المصرية صناعات", "WCDF": "مطاحن الدلتا",
-    "AJWA": "أجوة", "KABO": "كابو", "SAIB": "البنك العربي الأفريقي",
-    "UEFM": "مطاحن صعيد مصر", "ACTF": "أكت فايننشال", "UNIT": "المتحدة للإسكان",
-    "ASCM": "أسكوم", "ADCI": "الدواء العربي", "ARAB": "العربية للتعمير",
-    "OFH": "أو بي", "ACAMD": "إدارة الأصول العربية", "ISMA": "إسماعيلية للدواجن",
-    "ELSH": "الشمس للإسكان", "ETRS": "إيجي ترانس", "SDTI": "شرم دريمز",
-    "KZPC": "كفر الزيات", "ACGC": "القطن العربية", "LCSW": "ليسيكو",
-    "CFGH": "كونكريت فاشون", "ALRA": "أطلس", "ELKA": "القاهرة للإسكان",
-    "AFMC": "مطاحن الإسكندرية", "ZEOT": "الزيوت", "AMER": "أمير جروب",
-    "ATLC": "التوفيق للتأجير", "PHGC": "بريميوم هيلث", "SNFC": "أمن الغذاء بالشرقية",
-    "EDFM": "مطاحن الدلتا الشرقية", "NAHO": "نعيم", "GGRN": "جو جرين",
-    "DAPH": "دي إف جي", "INFI": "إسماعيلية للصناعات الغذائية",
-}
-
-
-# ─── Stock List Scraping ─────────────────────────────────────────────────────
 
 STOCKANALYSIS_URL = "https://stockanalysis.com/list/egyptian-stock-exchange/"
 FALLBACK_STOCKS_FILE = os.path.join(os.path.dirname(__file__), "egx_stocks.json")
 
 
+# ─── Data Collection ─────────────────────────────────────────────────────────
+
 def _load_fallback_stock_list() -> list[dict]:
-    """Load the saved stock list as fallback when scraping fails."""
+    """Load saved stock list as fallback."""
     try:
         with open(FALLBACK_STOCKS_FILE, "r", encoding="utf-8") as f:
             stocks = json.load(f)
@@ -106,9 +52,9 @@ def _load_fallback_stock_list() -> list[dict]:
 
 def scrape_egx_stock_list() -> list[dict]:
     """
-    Scrape the full list of all EGX stocks from stockanalysis.com.
+    Scrape the full EGX stock list from stockanalysis.com.
+    Validates every symbol against the canonical EGX list.
     Falls back to egx_stocks.json if scraping fails.
-    Returns list of dicts with: symbol, name, price, change_pct, market_cap_str.
     """
     headers = {
         "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
@@ -133,11 +79,11 @@ def scrape_egx_stock_list() -> list[dict]:
         logger.error("No tbody found in table")
         return _load_fallback_stock_list()
 
-    stocks = []
+    raw_stocks = []
     for row in tbody.find_all("tr"):
         cells = row.find_all("td")
         if len(cells) >= 5:
-            symbol = cells[1].get_text(strip=True)
+            symbol = normalize_symbol(cells[1].get_text(strip=True))
             name = cells[2].get_text(strip=True)
             price_str = cells[4].get_text(strip=True)
             change_str = cells[5].get_text(strip=True)
@@ -158,21 +104,27 @@ def scrape_egx_stock_list() -> list[dict]:
             except (ValueError, TypeError):
                 pass
 
-            if symbol and symbol != "No.":
-                stocks.append({
-                    "symbol": symbol.replace(".CA", ""),
+            if symbol and symbol != "NO." and validate_price(price):
+                raw_stocks.append({
+                    "symbol": symbol,
                     "name": name,
                     "price": price,
                     "change_pct": change_pct,
                     "market_cap_str": market_cap_str,
                 })
 
-    if not stocks:
-        logger.warning("Scraping returned 0 stocks. Using fallback.")
+    # Deduplicate
+    raw_stocks = deduplicate_stocks(raw_stocks)
+
+    # Update canonical list with freshly scraped symbols
+    update_canonical_list(raw_stocks)
+
+    if not raw_stocks:
+        logger.warning("Scraping returned 0 valid stocks. Using fallback.")
         return _load_fallback_stock_list()
 
-    logger.info(f"Scraped {len(stocks)} EGX stocks from stockanalysis.com")
-    return stocks
+    logger.info(f"Scraped {len(raw_stocks)} valid EGX stocks from stockanalysis.com")
+    return raw_stocks
 
 
 # ─── TradingView Historical Data ─────────────────────────────────────────────
@@ -181,7 +133,7 @@ _tv_instance = None
 
 
 def _get_tv():
-    """Lazy-initialize TradingView datafeed instance."""
+    """Lazy-initialize TradingView datafeed."""
     global _tv_instance
     if _tv_instance is None:
         from tvDatafeed import TvDatafeed, Interval
@@ -190,13 +142,8 @@ def _get_tv():
 
 
 def download_stock_history(ticker: str, n_bars: int = 250, retries: int = 2) -> Optional[pd.DataFrame]:
-    """
-    Download historical OHLCV data from TradingView.
-    Includes retry logic with exponential backoff.
-    Returns DataFrame with capitalized column names.
-    """
+    """Download historical OHLCV from TradingView with retry logic."""
     from tvDatafeed import TvDatafeed, Interval
-
     tv = _get_tv()
 
     for attempt in range(retries + 1):
@@ -210,22 +157,16 @@ def download_stock_history(ticker: str, n_bars: int = 250, retries: int = 2) -> 
                 if "symbol" in df.columns:
                     df = df.drop(columns=["symbol"])
                 return df
-
             if attempt < retries:
-                logger.debug(f"  {ticker}: no data (attempt {attempt+1}), retrying…")
                 time.sleep(1 * (attempt + 1))
             else:
                 return None
-
         except Exception as e:
-            err_str = str(e)[:80]
             if attempt < retries:
-                logger.debug(f"  {ticker}: {err_str} (attempt {attempt+1}), retrying…")
                 time.sleep(2 * (attempt + 1))
             else:
-                logger.warning(f"TradingView download failed for {ticker} after {retries+1} attempts: {err_str}")
+                logger.warning(f"TradingView failed for {ticker} after {retries+1} attempts: {str(e)[:80]}")
                 return None
-
     return None
 
 
@@ -233,16 +174,17 @@ def download_stock_history(ticker: str, n_bars: int = 250, retries: int = 2) -> 
 
 def scan_all_stocks() -> list[StockAnalysis]:
     """
-    Full scan of all EGX stocks:
-    1. Scrape stockanalysis.com for all 224 stocks with real-time prices
-    2. Download historical data from TradingView for each (with retries)
-    3. Calculate technical indicators
-    4. Return sorted by composite score (most bullish first)
+    Full pipeline:
+    1. Collect stock list (scrape + validate)
+    2. Download historical data per stock (with retries)
+    3. Validate OHLCV data
+    4. Compute technical indicators
+    5. Score each stock (0-100 deterministic)
+    6. Return sorted by composite score
     """
     stock_list = scrape_egx_stock_list()
-
     if not stock_list:
-        logger.error("No stocks available (scraping and fallback both failed).")
+        logger.error("No stocks available. All sources failed.")
         return []
 
     total = len(stock_list)
@@ -251,36 +193,58 @@ def scan_all_stocks() -> list[StockAnalysis]:
     results: list[StockAnalysis] = []
     success_count = 0
     fail_count = 0
+    rejected_count = 0
 
     for i, stock_info in enumerate(stock_list, 1):
         ticker = stock_info["symbol"]
         name_en = stock_info["name"]
-        name_ar = ARABIC_NAMES.get(ticker, name_en)
         live_price = stock_info["price"]
         live_change = stock_info["change_pct"]
 
-        if i % 20 == 0:
-            logger.info(f"Progress: {i}/{total} ({success_count} ok, {fail_count} failed)")
-
-        # Download historical data from TradingView (with retry)
-        df = download_stock_history(ticker, n_bars=250, retries=2)
-
-        if df is None or len(df) < 50:
-            logger.debug(f"  ⚠️ {ticker}: insufficient data, skipping indicators")
-            fail_count += 1
-            if live_price > 0:
-                analysis = StockAnalysis(
-                    ticker=ticker,
-                    name=name_en,
-                    name_ar=name_ar,
-                    current_price=live_price,
-                    daily_change_pct=live_change,
-                    volume=0,
-                )
-                results.append(analysis)
+        # Validate symbol
+        if not is_valid_egx_symbol(ticker):
+            logger.debug(f"  ❌ {ticker}: not a verified EGX symbol, skipping")
+            rejected_count += 1
             continue
 
-        # Calculate indicators
+        name_ar = get_arabic_name(ticker, name_en)
+
+        if i % 20 == 0:
+            logger.info(f"Progress: {i}/{total} ({success_count} ok, {fail_count} failed, {rejected_count} rejected)")
+
+        # Download historical data
+        df = download_stock_history(ticker, n_bars=250, retries=2)
+
+        # Validate OHLCV data
+        freshness = "unknown"
+        data_quality = 0.5
+
+        if df is not None and len(df) >= 50:
+            validation = validate_ohlcv(df, ticker)
+            freshness = validation.freshness
+            data_quality = validation.quality_score
+
+            if not validation.is_valid:
+                logger.debug(f"  ⚠️ {ticker}: data validation failed — {validation.issues[0] if validation.issues else 'unknown'}")
+                fail_count += 1
+                if live_price > 0:
+                    results.append(StockAnalysis(
+                        ticker=ticker, name=name_en, name_ar=name_ar,
+                        current_price=live_price, daily_change_pct=live_change, volume=0,
+                        data_freshness=freshness, data_quality=data_quality,
+                    ))
+                continue
+        elif df is None or len(df) < 50:
+            fail_count += 1
+            if live_price > 0:
+                results.append(StockAnalysis(
+                    ticker=ticker, name=name_en, name_ar=name_ar,
+                    current_price=live_price, daily_change_pct=live_change, volume=0,
+                    data_freshness="unknown", data_quality=0.3,
+                ))
+            continue
+
+        # Compute indicators
         try:
             analysis = analyze_stock(df, ticker, name_en, name_ar)
 
@@ -288,6 +252,15 @@ def scan_all_stocks() -> list[StockAnalysis]:
             if live_price > 0:
                 analysis.current_price = live_price
                 analysis.daily_change_pct = live_change
+
+            # Attach data quality metadata
+            analysis.data_freshness = freshness
+            analysis.data_quality = data_quality
+            analysis.timestamp = datetime.now().isoformat()
+
+            # Compute deterministic score
+            scoring = compute_score(analysis, freshness, data_quality)
+            analysis.scoring_result = scoring  # type: ignore[attr-defined]
 
             results.append(analysis)
             success_count += 1
@@ -299,95 +272,127 @@ def scan_all_stocks() -> list[StockAnalysis]:
                 results.append(StockAnalysis(
                     ticker=ticker, name=name_en, name_ar=name_ar,
                     current_price=live_price, daily_change_pct=live_change, volume=0,
+                    data_freshness="unknown", data_quality=0.3,
                 ))
 
         time.sleep(0.15)
 
-    # Sort by composite score (most bullish first)
     results.sort(key=lambda x: x.composite_score, reverse=True)
-
-    logger.info(f"Scan complete: {success_count} analyzed, {fail_count} skipped, {total} total")
+    logger.info(f"Scan complete: {success_count} analyzed, {fail_count} failed, {rejected_count} rejected, {total} total")
     return results
 
 
+# ─── Ranking Helpers ─────────────────────────────────────────────────────────
+
 def get_top_bullish(stocks: list[StockAnalysis], top_n: int = 10) -> list[StockAnalysis]:
-    """Return top N stocks with the strongest bullish signals."""
-    bullish = [s for s in stocks if s.composite_score >= 2]
+    """Top N stocks with strongest bullish signals AND acceptable data quality."""
+    bullish = [s for s in stocks if s.composite_score >= 2 and s.data_quality >= 0.5]
     return bullish[:top_n]
 
 
 def get_top_bearish(stocks: list[StockAnalysis], top_n: int = 5) -> list[StockAnalysis]:
-    """Return top N stocks with the strongest bearish signals."""
-    bearish = [s for s in stocks if s.composite_score <= -2]
+    """Top N stocks with strongest bearish signals AND acceptable data quality."""
+    bearish = [s for s in stocks if s.composite_score <= -2 and s.data_quality >= 0.5]
     bearish.sort(key=lambda x: x.composite_score)
     return bearish[:top_n]
 
 
-def format_analysis_for_ai(stocks: list[StockAnalysis], market_text: str = "") -> str:
-    """
-    Format stock analysis data as text for Gemini AI.
-    Includes market index context and top bullish/bearish stocks with full details.
-    Limited to top 20 bullish + top 10 bearish to stay within token limits.
-    """
-    lines = ["EGX STOCK TECHNICAL ANALYSIS REPORT", "=" * 50, ""]
+def get_buy_signals(stocks: list[StockAnalysis]) -> list[StockAnalysis]:
+    """Stocks with Buy recommendation from the scoring engine."""
+    return [s for s in stocks if hasattr(s, 'scoring_result') and s.scoring_result.recommendation == "Buy"]
 
-    # Include market context if provided
+
+def get_watchlist(stocks: list[StockAnalysis]) -> list[StockAnalysis]:
+    """Stocks with Watch or Buy recommendation."""
+    result = []
+    for s in stocks:
+        if hasattr(s, 'scoring_result'):
+            if s.scoring_result.recommendation in ("Buy", "Watch"):
+                result.append(s)
+    return result
+
+
+def get_single_stock(stocks: list[StockAnalysis], ticker: str) -> Optional[StockAnalysis]:
+    """Find a specific stock by ticker (case-insensitive)."""
+    ticker = normalize_symbol(ticker)
+    for s in stocks:
+        if s.ticker == ticker:
+            return s
+    return None
+
+
+# ─── Formatting ──────────────────────────────────────────────────────────────
+
+def format_analysis_for_ai(stocks: list[StockAnalysis], market_text: str = "") -> str:
+    """Format computed analysis data for AI explanation (not generation)."""
+    lines = ["EGX STOCK TECHNICAL ANALYSIS — COMPUTED DATA", "=" * 50, ""]
+
     if market_text:
         lines.append("MARKET INDEX DATA:")
         lines.append(market_text)
         lines.append("")
 
-    analyzed = [s for s in stocks if s.indicators]
+    analyzed = [s for s in stocks if s.indicators and s.data_quality >= 0.5]
     total_with_data = len(analyzed)
     total_all = len(stocks)
 
-    bullish_count = sum(1 for s in analyzed if s.composite_score >= 2)
-    bearish_count = sum(1 for s in analyzed if s.composite_score <= -2)
-    neutral_count = total_with_data - bullish_count - bearish_count
+    buy_count = sum(1 for s in analyzed if hasattr(s, 'scoring_result') and s.scoring_result.recommendation == "Buy")
+    watch_count = sum(1 for s in analyzed if hasattr(s, 'scoring_result') and s.scoring_result.recommendation == "Watch")
+    sell_count = sum(1 for s in analyzed if hasattr(s, 'scoring_result') and s.scoring_result.recommendation == "Sell")
 
     lines.append(f"Total stocks scanned: {total_all}")
     lines.append(f"Stocks with full analysis: {total_with_data}")
-    lines.append(f"Bullish: {bullish_count}, Bearish: {bearish_count}, Neutral: {neutral_count}")
+    lines.append(f"Buy signals: {buy_count}, Watch: {watch_count}, Sell: {sell_count}")
     lines.append("")
 
-    top_bull = get_top_bullish(stocks, 20)
-    lines.append("TOP BULLISH CANDIDATES (detailed):")
+    # Top stocks with full computed data
+    top = [s for s in analyzed if hasattr(s, 'scoring_result')]
+    top.sort(key=lambda x: x.scoring_result.total_score, reverse=True)
+    top = top[:20]
+
+    lines.append("TOP RANKED STOCKS (computed data only):")
     lines.append("")
-    for s in top_bull:
+    for s in top:
+        sr = s.scoring_result
         lines.append(f"Stock: {s.name} ({s.ticker}) | {s.name_ar}")
-        lines.append(f"  Price: {s.current_price} | Change: {s.daily_change_pct}%")
-        lines.append(f"  Signal: {s.signal_label} (score: {s.composite_score}, confidence: {s.signal_score_pct}%)")
-        lines.append("  Indicators:")
-        for ind in s.indicators:
+        lines.append(f"  Price: {s.current_price} EGP | Change: {s.daily_change_pct}%")
+        lines.append(f"  Score: {sr.total_score}/100 | Recommendation: {sr.recommendation}")
+        lines.append(f"  Risk: {sr.risk_level} — {sr.risk_reason}")
+        lines.append(f"  Data: {sr.data_freshness} (quality: {sr.data_quality:.1%})")
+        if s.support > 0:
+            lines.append(f"  Support: {s.support} | Resistance: {s.resistance} | R/R: {s.risk_reward_ratio:.1f}")
+        lines.append(f"  Key indicators:")
+        for ind in s.indicators[:8]:
             lines.append(f"    {ind.name}: {ind.value} ({ind.signal_text}) — {ind.note}")
-        if s.volume_profile:
-            vp = s.volume_profile
-            lines.append(f"    Volume Profile: POC={vp.poc}, VA=[{vp.value_area_low}-{vp.value_area_high}], Position: {vp.current_price_position}")
-        if s.bullish_reasons:
-            lines.append(f"  Bullish reasons: {'; '.join(s.bullish_reasons)}")
+        if sr.pass_reasons:
+            lines.append(f"  Positive factors: {'; '.join(sr.pass_reasons[:3])}")
+        if sr.fail_reasons:
+            lines.append(f"  Negative factors: {'; '.join(sr.fail_reasons[:3])}")
         lines.append("")
 
-    top_bear = get_top_bearish(stocks, 10)
-    lines.append("TOP BEARISH CANDIDATES (detailed):")
-    lines.append("")
-    for s in top_bear:
-        lines.append(f"Stock: {s.name} ({s.ticker}) | {s.name_ar}")
-        lines.append(f"  Price: {s.current_price} | Change: {s.daily_change_pct}%")
-        lines.append(f"  Signal: {s.signal_label} (score: {s.composite_score})")
-        lines.append("  Indicators:")
-        for ind in s.indicators:
-            lines.append(f"    {ind.name}: {ind.value} ({ind.signal_text}) — {ind.note}")
-        if s.bearish_reasons:
-            lines.append(f"  Bearish reasons: {'; '.join(s.bearish_reasons)}")
+    # Bottom-ranked (bearish)
+    bottom = [s for s in analyzed if hasattr(s, 'scoring_result')]
+    bottom.sort(key=lambda x: x.scoring_result.total_score)
+    bottom = bottom[:10]
+
+    if bottom:
+        lines.append("BOTTOM RANKED STOCKS (bearish):")
         lines.append("")
+        for s in bottom:
+            sr = s.scoring_result
+            if sr.recommendation == "Sell" or sr.total_score < 40:
+                lines.append(f"Stock: {s.name} ({s.ticker}) | {s.name_ar}")
+                lines.append(f"  Price: {s.current_price} EGP | Score: {sr.total_score}/100 | Rec: {sr.recommendation}")
+                if sr.fail_reasons:
+                    lines.append(f"  Reasons: {'; '.join(sr.fail_reasons[:3])}")
+                lines.append("")
 
     return "\n".join(lines)
 
 
 def format_analysis_for_telegram(stocks: list[StockAnalysis]) -> str:
-    """Fallback Telegram formatting if Gemini AI is unavailable."""
+    """Fallback Telegram formatting (no AI)."""
     from ai_report import _escape_markdown
-
     lines = []
     top_bull = get_top_bullish(stocks, 10)
     top_bear = get_top_bearish(stocks, 5)
@@ -413,19 +418,3 @@ def format_analysis_for_telegram(stocks: list[StockAnalysis]) -> str:
             lines.append("")
 
     return "\n".join(lines)
-
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(message)s")
-
-    print("=== Full EGX Stock Scan ===")
-    stocks = scan_all_stocks()
-    print(f"\nAnalyzed {len(stocks)} stocks\n")
-
-    print("=== Top 10 Bullish ===")
-    for s in get_top_bullish(stocks, 10):
-        print(f"  🟢 {s.name_ar}: {s.signal_label} (score={s.composite_score})")
-
-    print("\n=== Top 5 Bearish ===")
-    for s in get_top_bearish(stocks, 5):
-        print(f"  🔴 {s.name_ar}: {s.signal_label} (score={s.composite_score})")
