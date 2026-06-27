@@ -1,0 +1,44 @@
+name: EGX Daily Market Report
+
+on:
+  # Runs at 10:30 AM Cairo time (UTC+2) on Sunday–Thursday (EGX trading days)
+  # Cron uses UTC: 08:30 UTC = 10:30 Cairo (standard time)
+  # Adjust to 07:30 UTC in summer (EET = UTC+3) if needed
+  schedule:
+    - cron: "30 8 * * 0-4"
+
+  # Allow manual trigger from GitHub Actions UI
+  workflow_dispatch:
+
+jobs:
+  send-report:
+    name: Fetch & Send EGX Report
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Send daily EGX report
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python bot.py --scheduled
