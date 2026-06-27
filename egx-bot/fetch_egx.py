@@ -3,8 +3,8 @@ fetch_egx.py
 ------------
 Fetches Egyptian Exchange (EGX) market data from public sources.
 
-Primary source: Investing.com (EGX 30 index & top movers)
-Fallback source: EGX official site (egyptse.com)
+Primary source: Trading Economics (tradingeconomics.com)
+Provides: EGX 30 index value, daily change, monthly & yearly performance.
 
 No API keys required. No sensitive data stored.
 """
@@ -26,26 +26,11 @@ HEADERS = {
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/124.0.0.0 Safari/537.36"
     ),
-    "Accept-Language": "en-US,en;q=0.9,ar;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
 }
 
-EGX30_INVESTING_URL = "https://www.investing.com/indices/egx-30"
-EGX_MOVERS_URL = "https://www.investing.com/equities/egypt"
-EGX_OFFICIAL_URL = "https://www.egyptse.com/market-data"
-
-# Arabic day/month names for date formatting
-ARABIC_DAYS = {
-    "Monday": "الإثنين", "Tuesday": "الثلاثاء", "Wednesday": "الأربعاء",
-    "Thursday": "الخميس", "Friday": "الجمعة", "Saturday": "السبت",
-    "Sunday": "الأحد",
-}
-ARABIC_MONTHS = {
-    "January": "يناير", "February": "فبراير", "March": "مارس",
-    "April": "أبريل", "May": "مايو", "June": "يونيو",
-    "July": "يوليو", "August": "أغسطس", "September": "سبتمبر",
-    "October": "أكتوبر", "November": "نوفمبر", "December": "ديسمبر",
-}
+TRADING_ECONOMICS_URL = "https://tradingeconomics.com/egypt/stock-market"
 
 
 @dataclass
@@ -55,6 +40,9 @@ class MarketSummary:
     change: Optional[str]
     change_pct: Optional[str]
     direction: str  # "up", "down", "flat"
+    month_change_pct: Optional[str] = None
+    year_change_pct: Optional[str] = None
+    date_str: Optional[str] = None
     top_gainers: list = field(default_factory=list)
     top_losers: list = field(default_factory=list)
     most_active: list = field(default_factory=list)
@@ -82,20 +70,24 @@ def _safe_get(url: str, timeout: int = 15, retries: int = 2) -> Optional[request
                 return None
 
 
-def _parse_change_value(change_text: str) -> float:
-    """Extract numeric value from a change string like '+1,234.56' or '-500.00'."""
-    if not change_text:
-        return 0.0
-    cleaned = re.sub(r"[^\d.\-]", "", change_text.replace(",", ""))
+def _parse_number(text: str) -> Optional[float]:
+    """Extract a float from a string like '51,443.07' or '-267.83'."""
+    if not text:
+        return None
+    cleaned = re.sub(r"[^\d.\-]", "", text.replace(",", ""))
     try:
         return float(cleaned)
     except ValueError:
-        return 0.0
+        return None
 
 
 def fetch_egx30_index() -> dict:
-    """Scrape EGX 30 index summary from Investing.com."""
-    resp = _safe_get(EGX30_INVESTING_URL)
+    """
+    Scrape EGX 30 index data from Trading Economics.
+    Returns dict with: value, change, change_pct, month_change_pct,
+    year_change_pct, direction, date_str.
+    """
+    resp = _safe_get(TRADING_ECONOMICS_URL)
     if not resp:
         return {}
 
@@ -103,89 +95,52 @@ def fetch_egx30_index() -> dict:
     data = {}
 
     try:
-        # Try multiple selector patterns — Investing.com changes these often
-        price_el = (
-            soup.select_one('[data-test="instrument-price-last"]')
-            or soup.select_one("span.text-2xl")
-            or soup.select_one(".instrument-price_last__3qDsf")
-        )
-        if price_el:
-            data["value"] = price_el.get_text(strip=True)
+        # Trading Economics has the EGX 30 in a table on the Egypt stock market page
+        tables = soup.find_all("table")
+        for table in tables:
+            rows = table.find_all("tr")
+            for row in rows:
+                cells = row.find_all("td")
+                if len(cells) >= 2 and cells[0].get_text(strip=True) == "EGX 30":
+                    # Parse the row: [name, price, _, change, day%, month%, year%, date]
+                    if len(cells) >= 7:
+                        data["value"] = cells[1].get_text(strip=True)
+                        data["change"] = cells[3].get_text(strip=True)
+                        data["change_pct"] = cells[4].get_text(strip=True)
+                        data["month_change_pct"] = cells[5].get_text(strip=True)
+                        data["year_change_pct"] = cells[6].get_text(strip=True)
+                    elif len(cells) >= 5:
+                        data["value"] = cells[1].get_text(strip=True)
+                        data["change"] = cells[3].get_text(strip=True)
+                        data["change_pct"] = cells[4].get_text(strip=True)
 
-        change_el = (
-            soup.select_one('[data-test="instrument-price-change"]')
-            or soup.select_one(".instrument-price_change__3f2Uc")
-        )
-        pct_el = (
-            soup.select_one('[data-test="instrument-price-change-percent"]')
-            or soup.select_one(".instrument-price_change__3f2Uc + span")
-        )
-        if change_el:
-            data["change"] = change_el.get_text(strip=True)
-        if pct_el:
-            raw = pct_el.get_text(strip=True).strip("()")
-            data["change_pct"] = raw
+                    # Date might be in the last cell
+                    if len(cells) >= 8:
+                        data["date_str"] = cells[7].get_text(strip=True)
 
-        # Determine direction from change value
-        change_val = _parse_change_value(data.get("change", "0"))
-        if change_val < 0:
-            data["direction"] = "down"
-        elif change_val > 0:
-            data["direction"] = "up"
-        else:
-            data["direction"] = "flat"
+                    # Determine direction from change value
+                    change_val = _parse_number(data.get("change", "0"))
+                    if change_val is not None:
+                        if change_val < 0:
+                            data["direction"] = "down"
+                        elif change_val > 0:
+                            data["direction"] = "up"
+                        else:
+                            data["direction"] = "flat"
+                    else:
+                        data["direction"] = "flat"
 
+                    logger.info(
+                        f"EGX 30: {data.get('value', 'N/A')} "
+                        f"({data.get('change', 'N/A')}, {data.get('change_pct', 'N/A')})"
+                    )
+                    return data
+
+        logger.warning("EGX 30 row not found in Trading Economics tables.")
     except Exception as e:
-        logger.warning(f"Error parsing EGX30 index: {e}")
+        logger.warning(f"Error parsing Trading Economics page: {e}")
 
     return data
-
-
-def fetch_top_movers() -> dict:
-    """
-    Scrape top gainers, losers, and most active from Investing.com Egypt equities.
-    Returns dict with keys: gainers, losers, most_active.
-    """
-    resp = _safe_get(EGX_MOVERS_URL)
-    result = {"gainers": [], "losers": [], "most_active": []}
-
-    if not resp:
-        return result
-
-    soup = BeautifulSoup(resp.text, "html.parser")
-
-    def parse_table(table_id: str) -> list:
-        """Parse a movers table by ID, with fallback to class-based search."""
-        rows = []
-        table = soup.find("table", {"id": table_id})
-        if not table:
-            # Fallback: try common Investing.com table classes
-            table = soup.select_one(f"table.{table_id}")
-        if not table:
-            return rows
-
-        for tr in table.select("tbody tr")[:5]:
-            cells = tr.find_all("td")
-            if len(cells) >= 3:
-                rows.append({
-                    "name": cells[1].get_text(strip=True) if len(cells) > 1 else "—",
-                    "price": cells[2].get_text(strip=True) if len(cells) > 2 else "—",
-                    "change_pct": cells[-1].get_text(strip=True) if cells else "—",
-                })
-        return rows
-
-    result["gainers"] = parse_table("gainers")
-    result["losers"] = parse_table("losers")
-    result["most_active"] = parse_table("most_active")
-
-    # If Investing.com tables not found, try scanning for stock screener tables
-    if not result["gainers"] and not result["losers"]:
-        logger.warning(
-            "Investing.com movers tables not found. "
-            "Site structure may have changed."
-        )
-
-    return result
 
 
 def build_market_summary() -> MarketSummary:
@@ -193,19 +148,18 @@ def build_market_summary() -> MarketSummary:
     Aggregate all market data into a single MarketSummary object.
     Falls back gracefully — partial data is better than no data.
     """
-    logger.info("Fetching EGX 30 index data…")
+    logger.info("Fetching EGX 30 index data from Trading Economics…")
     index_data = fetch_egx30_index()
-
-    logger.info("Fetching top movers…")
-    movers = fetch_top_movers()
 
     value = index_data.get("value", "N/A")
     change = index_data.get("change", "N/A")
     change_pct = index_data.get("change_pct", "N/A")
     direction = index_data.get("direction", "flat")
+    month_pct = index_data.get("month_change_pct")
+    year_pct = index_data.get("year_change_pct")
+    date_str = index_data.get("date_str")
 
-    # If we got nothing at all, mark as non-trading or source failure
-    has_data = value != "N/A" or bool(movers["gainers"]) or bool(movers["losers"])
+    has_data = value != "N/A"
 
     return MarketSummary(
         index_name="EGX 30",
@@ -213,10 +167,10 @@ def build_market_summary() -> MarketSummary:
         change=change,
         change_pct=change_pct,
         direction=direction,
-        top_gainers=movers["gainers"],
-        top_losers=movers["losers"],
-        most_active=movers["most_active"],
-        source_note="البيانات من Investing.com – للأغراض المعلوماتية فقط." if has_data
+        month_change_pct=month_pct,
+        year_change_pct=year_pct,
+        date_str=date_str,
+        source_note="البيانات من Trading Economics – للأغراض المعلوماتية فقط." if has_data
                     else "تعذّر جلب البيانات. قد تكون البورصة مغلقة.",
         is_trading_day=has_data,
     )
@@ -231,25 +185,12 @@ def format_summary_text(summary: MarketSummary) -> str:
     lines = [
         f"EGX 30 Index: {summary.current_value} {arrow}",
         f"Change: {summary.change} ({summary.change_pct})",
-        "",
     ]
 
-    if summary.top_gainers:
-        lines.append("Top Gainers:")
-        for s in summary.top_gainers:
-            lines.append(f"  {s['name']}: {s['price']} ({s['change_pct']})")
-        lines.append("")
-
-    if summary.top_losers:
-        lines.append("Top Losers:")
-        for s in summary.top_losers:
-            lines.append(f"  {s['name']}: {s['price']} ({s['change_pct']})")
-        lines.append("")
-
-    if summary.most_active:
-        lines.append("Most Active:")
-        for s in summary.most_active:
-            lines.append(f"  {s['name']}: {s['price']} ({s['change_pct']})")
+    if summary.month_change_pct:
+        lines.append(f"Monthly Change: {summary.month_change_pct}")
+    if summary.year_change_pct:
+        lines.append(f"Yearly Change: {summary.year_change_pct}")
 
     return "\n".join(lines)
 

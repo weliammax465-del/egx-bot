@@ -9,9 +9,8 @@ Run: python -m pytest tests/ -v
 
 import os
 import sys
-import json
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import patch, MagicMock
 from datetime import datetime
 
 # Add project root to path
@@ -21,7 +20,7 @@ from fetch_egx import (
     MarketSummary,
     build_market_summary,
     format_summary_text,
-    _parse_change_value,
+    _parse_number,
     _safe_get,
 )
 from ai_report import (
@@ -39,24 +38,14 @@ def mock_summary():
     """A realistic MarketSummary for testing."""
     return MarketSummary(
         index_name="EGX 30",
-        current_value="27,500.32",
-        change="+123.45",
-        change_pct="0.45%",
-        direction="up",
-        top_gainers=[
-            {"name": "CIB", "price": "52.30", "change_pct": "+4.5%"},
-            {"name": "COMI", "price": "38.10", "change_pct": "+3.2%"},
-            {"name": "EFIH", "price": "21.50", "change_pct": "+2.8%"},
-        ],
-        top_losers=[
-            {"name": "TMGH", "price": "3.12", "change_pct": "-3.1%"},
-            {"name": "CCAP", "price": "15.40", "change_pct": "-2.5%"},
-            {"name": "EKHO", "price": "8.20", "change_pct": "-1.9%"},
-        ],
-        most_active=[
-            {"name": "CIB", "price": "52.30", "change_pct": "+4.5%"},
-        ],
-        source_note="البيانات من Investing.com – للأغراض المعلوماتية فقط.",
+        current_value="51,443.07",
+        change="-267.83",
+        change_pct="-0.52%",
+        direction="down",
+        month_change_pct="-2.67%",
+        year_change_pct="54.92%",
+        date_str="Jun/25",
+        source_note="البيانات من Trading Economics – للأغراض المعلوماتية فقط.",
         is_trading_day=True,
     )
 
@@ -70,9 +59,6 @@ def empty_summary():
         change="N/A",
         change_pct="N/A",
         direction="flat",
-        top_gainers=[],
-        top_losers=[],
-        most_active=[],
         source_note="تعذّر جلب البيانات.",
         is_trading_day=False,
     )
@@ -80,21 +66,24 @@ def empty_summary():
 
 # ─── fetch_egx.py Tests ──────────────────────────────────────────────────────
 
-class TestParseChangeValue:
+class TestParseNumber:
     def test_positive_with_commas(self):
-        assert _parse_change_value("+1,234.56") == pytest.approx(1234.56)
+        assert _parse_number("51,443.07") == pytest.approx(51443.07)
 
     def test_negative(self):
-        assert _parse_change_value("-500.00") == pytest.approx(-500.0)
+        assert _parse_number("-267.83") == pytest.approx(-267.83)
 
     def test_empty(self):
-        assert _parse_change_value("") == 0.0
+        assert _parse_number("") is None
 
     def test_garbage(self):
-        assert _parse_change_value("N/A") == 0.0
+        assert _parse_number("N/A") is None
 
     def test_plain_number(self):
-        assert _parse_change_value("42") == pytest.approx(42.0)
+        assert _parse_number("42") == pytest.approx(42.0)
+
+    def test_none(self):
+        assert _parse_number(None) is None
 
 
 class TestSafeGet:
@@ -131,47 +120,77 @@ class TestSafeGet:
 class TestFormatSummaryText:
     def test_full_summary(self, mock_summary):
         text = format_summary_text(mock_summary)
-        assert "EGX 30 Index: 27,500.32 📈" in text
-        assert "Top Gainers:" in text
-        assert "CIB" in text
-        assert "Top Losers:" in text
-        assert "TMGH" in text
+        assert "EGX 30 Index: 51,443.07 📉" in text
+        assert "Change: -267.83" in text
+        assert "Monthly Change: -2.67%" in text
+        assert "Yearly Change: 54.92%" in text
 
     def test_empty_summary(self, empty_summary):
         text = format_summary_text(empty_summary)
         assert "EGX 30 Index: N/A" in text
-        assert "Top Gainers:" not in text
+        # No monthly/yearly for empty
+        assert "Monthly" not in text
 
 
 class TestBuildMarketSummary:
-    @patch("fetch_egx.fetch_top_movers")
     @patch("fetch_egx.fetch_egx30_index")
-    def test_with_data(self, mock_index, mock_movers):
+    def test_with_data(self, mock_index):
         mock_index.return_value = {
-            "value": "27,500.32",
-            "change": "+123.45",
-            "change_pct": "0.45%",
-            "direction": "up",
-        }
-        mock_movers.return_value = {
-            "gainers": [{"name": "CIB", "price": "52", "change_pct": "+4%"}],
-            "losers": [{"name": "TMGH", "price": "3", "change_pct": "-3%"}],
-            "most_active": [],
+            "value": "51,443.07",
+            "change": "-267.83",
+            "change_pct": "-0.52%",
+            "month_change_pct": "-2.67%",
+            "year_change_pct": "54.92%",
+            "direction": "down",
+            "date_str": "Jun/25",
         }
         summary = build_market_summary()
-        assert summary.current_value == "27,500.32"
-        assert summary.direction == "up"
-        assert len(summary.top_gainers) == 1
+        assert summary.current_value == "51,443.07"
+        assert summary.direction == "down"
+        assert summary.month_change_pct == "-2.67%"
         assert summary.is_trading_day is True
 
-    @patch("fetch_egx.fetch_top_movers")
     @patch("fetch_egx.fetch_egx30_index")
-    def test_no_data(self, mock_index, mock_movers):
+    def test_no_data(self, mock_index):
         mock_index.return_value = {}
-        mock_movers.return_value = {"gainers": [], "losers": [], "most_active": []}
         summary = build_market_summary()
         assert summary.current_value == "N/A"
         assert summary.is_trading_day is False
+
+
+class TestFetchEgx30Index:
+    @patch("fetch_egx._safe_get")
+    def test_parses_trading_economics_table(self, mock_get):
+        """Test that we can parse the Trading Economics HTML table format."""
+        from bs4 import BeautifulSoup
+        mock_resp = MagicMock()
+        # Simulate Trading Economics HTML table
+        html = """
+        <table>
+            <tr><th>Indexes</th><th>Price</th><th></th><th></th><th>Day</th><th>Month</th><th>Year</th><th>Date</th></tr>
+            <tr>
+                <td>EGX 30</td><td>51,443.07</td><td></td>
+                <td>-267.83</td><td>-0.52%</td><td>-2.67%</td><td>54.92%</td>
+                <td>Jun/25</td>
+            </tr>
+        </table>
+        """
+        mock_resp.text = html
+        mock_get.return_value = mock_resp
+
+        from fetch_egx import fetch_egx30_index
+        data = fetch_egx30_index()
+        assert data["value"] == "51,443.07"
+        assert data["change"] == "-267.83"
+        assert data["change_pct"] == "-0.52%"
+        assert data["direction"] == "down"
+
+    @patch("fetch_egx._safe_get")
+    def test_returns_empty_on_failure(self, mock_get):
+        mock_get.return_value = None
+        from fetch_egx import fetch_egx30_index
+        data = fetch_egx30_index()
+        assert data == {}
 
 
 # ─── ai_report.py Tests ──────────────────────────────────────────────────────
@@ -199,7 +218,6 @@ class TestEscapeMarkdown:
 class TestFormatArabicDate:
     def test_returns_arabic(self):
         date_str = _format_arabic_date()
-        # Should contain Arabic month names
         arabic_months = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
                          "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"]
         assert any(month in date_str for month in arabic_months)
@@ -231,7 +249,7 @@ class TestGenerateArabicReport:
             mock_genai.configure = MagicMock()
             mock_genai.GenerativeModel.return_value = mock_model
 
-            result = generate_arabic_report("EGX 30: 27500 +123")
+            result = generate_arabic_report("EGX 30: 51443 -267")
             assert "ملخص عربي" in result
             mock_model.generate_content.assert_called_once()
 
@@ -244,8 +262,8 @@ class TestGenerateArabicReport:
             mock_genai.configure = MagicMock()
             mock_genai.GenerativeModel.return_value = mock_model
 
-            result = generate_arabic_report("EGX 30: 27500")
-            assert "تعذّر" in result or "EGX 30" in result  # Fallback message or raw data
+            result = generate_arabic_report("EGX 30: 51443")
+            assert "تعذّر" in result or "EGX 30" in result
 
 
 class TestBuildTelegramMessage:
@@ -254,8 +272,6 @@ class TestBuildTelegramMessage:
         assert "تقرير البورصة المصرية اليومي" in msg
         assert "EGX 30" in msg
         assert "ملخص الذكاء الاصطناعي" in msg
-        assert "CIB" in msg
-        assert "TMGH" in msg
         assert "نصيحة استثمارية" in msg
 
     def test_empty_market(self, empty_summary):
@@ -277,42 +293,38 @@ class TestBuildTelegramMessage:
             change_pct="1%",
             direction="up",
             top_gainers=[{"name": "TEST_STOCK", "price": "10", "change_pct": "+5%"}],
-            top_losers=[],
-            most_active=[],
         )
         msg = build_telegram_message("summary", summary)
-        assert "TEST\\_STOCK" in msg  # Underscore escaped
+        assert "TEST\\_STOCK" in msg
 
 
 # ─── bot.py Tests ────────────────────────────────────────────────────────────
 
 class TestTradingDayCheck:
     def test_friday_is_not_trading(self):
-        """Friday should not be a trading day."""
         from bot import _is_egx_trading_day
-        # Mock datetime to return a Friday
-        friday = datetime(2026, 6, 26, 10, 0, 0)  # Friday June 26, 2026
+        friday = datetime(2026, 6, 26, 10, 0, 0)  # Friday
         with patch("bot.datetime") as mock_dt:
             mock_dt.now.return_value = friday
             assert _is_egx_trading_day() is False
 
     def test_saturday_is_not_trading(self):
         from bot import _is_egx_trading_day
-        saturday = datetime(2026, 6, 27, 10, 0, 0)  # Saturday June 27, 2026
+        saturday = datetime(2026, 6, 27, 10, 0, 0)  # Saturday
         with patch("bot.datetime") as mock_dt:
             mock_dt.now.return_value = saturday
             assert _is_egx_trading_day() is False
 
     def test_sunday_is_trading(self):
         from bot import _is_egx_trading_day
-        sunday = datetime(2026, 6, 28, 10, 0, 0)  # Sunday June 28, 2026
+        sunday = datetime(2026, 6, 28, 10, 0, 0)  # Sunday
         with patch("bot.datetime") as mock_dt:
             mock_dt.now.return_value = sunday
             assert _is_egx_trading_day() is True
 
     def test_thursday_is_trading(self):
         from bot import _is_egx_trading_day
-        thursday = datetime(2026, 7, 2, 10, 0, 0)  # Thursday July 2, 2026
+        thursday = datetime(2026, 7, 2, 10, 0, 0)  # Thursday
         with patch("bot.datetime") as mock_dt:
             mock_dt.now.return_value = thursday
             assert _is_egx_trading_day() is True
@@ -328,10 +340,8 @@ class TestCheckEnv:
     def test_present_env_passes(self):
         with patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "x", "GEMINI_API_KEY": "y"}):
             from bot import check_env
-            check_env()  # Should not raise
+            check_env()
 
-
-# ─── Run ─────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
