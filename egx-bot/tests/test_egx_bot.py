@@ -820,7 +820,7 @@ class TestEdgeCases:
     def test_breakout_scoring_uses_signal_not_text(self, sample_ohlcv):
         """Regression: _score_breakout checked English 'bullish' in Arabic text — never matched."""
         from indicators import analyze_stock, IndicatorResult
-        from scoring import _score_breakout
+        from scoring import _score_breakout_v1 as _score_breakout
         
         # Create a stock with a bullish breakout signal
         a = analyze_stock(sample_ohlcv, "T", "T", "ت")
@@ -839,7 +839,7 @@ class TestEdgeCases:
     def test_breakout_scoring_bearish_signal(self, sample_ohlcv):
         """Bearish breakout (signal=-1) should decrease score."""
         from indicators import analyze_stock, IndicatorResult
-        from scoring import _score_breakout
+        from scoring import _score_breakout_v1 as _score_breakout
         
         a = analyze_stock(sample_ohlcv, "T", "T", "ت")
         # Replace existing Breakout indicator (not append — _get_indicator returns first match)
