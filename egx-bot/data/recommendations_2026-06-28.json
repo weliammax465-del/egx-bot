@@ -1,0 +1,32 @@
+{
+  "report_date": "2026-06-28",
+  "recommendations": [
+    {
+      "ticker": "COMI",
+      "name_ar": "كومي",
+      "score": 75,
+      "price": 150.0,
+      "type": "Buy",
+      "risk_level": "Medium"
+    },
+    {
+      "ticker": "SWDY",
+      "name_ar": "سويدي",
+      "score": 55,
+      "price": 80.0,
+      "type": "Watch",
+      "risk_level": "Low"
+    }
+  ],
+  "current_prices": {
+    "COMI": 150.0,
+    "SWDY": 80.0,
+    "ETEL": 30.0
+  },
+  "total_stocks_scanned": 3,
+  "total_recommendations": 2,
+  "buy_count": 1,
+  "watch_count": 1,
+  "sell_count": 0,
+  "no_trade_count": 1
+}

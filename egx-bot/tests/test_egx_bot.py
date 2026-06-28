@@ -1043,3 +1043,89 @@ class TestEdgeCases:
         # Cleanup
         if os.path.exists(".egx_last_report.json"):
             os.remove(".egx_last_report.json")
+
+    def test_save_recommendations_json(self):
+        """save_recommendations_json should save recommendations and current prices to JSON."""
+        import json
+        import os
+        import tempfile
+        from bot import save_recommendations_json
+        from indicators import StockAnalysis, IndicatorResult
+        from scoring import ScoringResult, ScoreFactor
+
+        # Create mock stock analysis objects
+        stock1 = StockAnalysis(
+            ticker="COMI", name="Commercial Intl", name_ar="كومي",
+            current_price=150.0, daily_change_pct=2.5, volume=1000000,
+            composite_score=75,
+            scoring_result=ScoringResult(
+                total_score=75,
+                recommendation="Buy",
+                recommendation_ar="شراء",
+                factors=[ScoreFactor(name="trend", name_ar="الاتجاه", raw_score=80, weight=20, weighted_score=16, reason="Uptrend")],
+                risk_level="Medium",
+            ),
+        )
+        stock2 = StockAnalysis(
+            ticker="SWDY", name="Edita", name_ar="سويدي",
+            current_price=80.0, daily_change_pct=-1.0, volume=500000,
+            composite_score=55,
+            scoring_result=ScoringResult(
+                total_score=55,
+                recommendation="Watch",
+                recommendation_ar="مراقبة",
+                factors=[ScoreFactor(name="trend", name_ar="الاتجاه", raw_score=50, weight=20, weighted_score=10, reason="Sideways")],
+                risk_level="Low",
+            ),
+        )
+        stock3 = StockAnalysis(
+            ticker="ETEL", name="Telecom Egypt", name_ar="اتصالات",
+            current_price=30.0, daily_change_pct=0.5, volume=200000,
+            composite_score=25,
+            scoring_result=ScoringResult(
+                total_score=25,
+                recommendation="No Trade",
+                recommendation_ar="لا تداول",
+                factors=[ScoreFactor(name="data", name_ar="البيانات", raw_score=10, weight=10, weighted_score=1, reason="Poor data")],
+                risk_level="High",
+            ),
+        )
+
+        # Save to a temp directory
+        with tempfile.TemporaryDirectory() as tmpdir:
+            old_cwd = os.getcwd()
+            os.chdir(tmpdir)
+            try:
+                # Create data dir
+                os.makedirs("data", exist_ok=True)
+                filepath = save_recommendations_json([stock1, stock2, stock3], "2026-06-28")
+
+                # Read and verify
+                with open(filepath, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+
+                assert data["report_date"] == "2026-06-28"
+                assert data["total_stocks_scanned"] == 3
+                assert data["total_recommendations"] == 2  # Only Buy + Watch, not No Trade
+                assert data["buy_count"] == 1
+                assert data["watch_count"] == 1
+                assert data["sell_count"] == 0
+                assert data["no_trade_count"] == 1
+
+                # Check recommendations
+                recs = data["recommendations"]
+                assert len(recs) == 2
+                assert recs[0]["ticker"] == "COMI"
+                assert recs[0]["type"] == "Buy"
+                assert recs[0]["score"] == 75
+                assert recs[0]["price"] == 150.0
+
+                # Check current prices (all stocks, including No Trade)
+                prices = data["current_prices"]
+                assert "COMI" in prices
+                assert "SWDY" in prices
+                assert "ETEL" in prices
+                assert prices["COMI"] == 150.0
+            finally:
+                os.chdir(old_cwd)
+

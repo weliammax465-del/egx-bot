@@ -9,7 +9,7 @@ on:
   workflow_call:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   # Prevent duplicate runs — if a new run starts, the old one continues
@@ -88,6 +88,27 @@ jobs:
           echo "❌ All 3 workflow attempts failed"
           exit 1
         timeout-minutes: 25
+
+
+      # ── Save Recommendations JSON ─────────────────────────────────
+      # Commit the recommendations JSON file for performance tracking.
+      # A Base44 automation reads this file to save recommendations
+      # to the RecommendationHistory entity and evaluate past ones.
+      - name: Commit recommendations JSON
+        if: success() && steps.check-sent.outputs.cache-hit != 'true'
+        run: |
+          git config user.name "EGX Bot"
+          git config user.email "bot@egx-bot.local"
+          # Check if there are any changes (recommendations JSON file)
+          if [ -n "$(git status --porcelain data/recommendations_*.json)" ]; then
+            git add data/recommendations_*.json
+            git commit -m "📊 Recommendations for ${{ steps.date.outputs.today }}"
+            git push
+            echo "✅ Recommendations JSON committed"
+          else
+            echo "ℹ️ No recommendations JSON to commit"
+          fi
+        continue-on-error: true
 
       # ── Failure Notification ──────────────────────────────────────
       - name: Notify on failure

@@ -351,6 +351,70 @@ async def cmd_stock(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 # ─── Scheduled Push ──────────────────────────────────────────────────────────
 
+
+
+# ─── Recommendation Tracking ────────────────────────────────────────────────
+
+def save_recommendations_json(stocks: list, report_date: str) -> str:
+    """
+    Save today's recommendations and current prices to a JSON file.
+    This file is committed to the repo and processed by a Base44 automation
+    to track recommendation performance over time (7-day and 30-day evaluation).
+    
+    Returns the path to the saved JSON file.
+    """
+    import json
+    from pathlib import Path
+    
+    recommendations = []
+    current_prices = {}
+    
+    for s in stocks:
+        # Current price for all stocks (used for evaluating past recommendations)
+        if s.current_price > 0:
+            current_prices[s.ticker] = round(s.current_price, 2)
+        
+        # Only save actionable recommendations (Buy, Watch, Sell) — not "No Trade"
+        if s.scoring_result and s.scoring_result.recommendation in ("Buy", "Watch", "Sell"):
+            recommendations.append({
+                "ticker": s.ticker,
+                "name_ar": s.name_ar,
+                "score": s.scoring_result.total_score,
+                "price": round(s.current_price, 2),
+                "type": s.scoring_result.recommendation,
+                "risk_level": s.scoring_result.risk_level,
+            })
+    
+    # Count by recommendation type
+    buy_count = sum(1 for r in recommendations if r["type"] == "Buy")
+    watch_count = sum(1 for r in recommendations if r["type"] == "Watch")
+    sell_count = sum(1 for r in recommendations if r["type"] == "Sell")
+    no_trade_count = len(stocks) - len(recommendations)
+
+    data = {
+        "report_date": report_date,
+        "recommendations": recommendations,
+        "current_prices": current_prices,
+        "total_stocks_scanned": len(stocks),
+        "total_recommendations": len(recommendations),
+        "buy_count": buy_count,
+        "watch_count": watch_count,
+        "sell_count": sell_count,
+        "no_trade_count": no_trade_count,
+    }
+    
+    # Save to data/ directory
+    output_dir = Path(__file__).parent / "data"
+    output_dir.mkdir(exist_ok=True)
+    output_path = output_dir / f"recommendations_{report_date}.json"
+    
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    
+    logger.info(f"Saved {len(recommendations)} recommendations to {output_path}")
+    return str(output_path)
+
+
 async def send_scheduled_report(force: bool = False) -> bool:
     """
     Push daily report to TELEGRAM_CHAT_ID (called by GitHub Actions).
@@ -455,6 +519,13 @@ async def send_scheduled_report(force: bool = False) -> bool:
                 "market_value": str(market_summary.current_value) if market_summary else "N/A",
                 "market_change": str(market_summary.change) if market_summary else "N/A",
             })
+
+            # Save recommendations for performance tracking
+            report_date = datetime.now(CAIRO_TZ).strftime("%Y-%m-%d")
+            try:
+                save_recommendations_json(stocks, report_date)
+            except Exception as e:
+                logger.warning(f"Failed to save recommendations JSON: {e}")
 
             # Mark as sent — prevents duplicates on retry
             _mark_sent_today()
