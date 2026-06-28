@@ -1,0 +1,96 @@
+{
+  "properties": {
+    "recommendation_date": {
+      "type": "string",
+      "description": "YYYY-MM-DD \u2014 the date the recommendation was issued"
+    },
+    "ticker": {
+      "type": "string",
+      "description": "Stock symbol (e.g. COMI)"
+    },
+    "score_at_recommendation": {
+      "type": "number",
+      "description": "Composite score (0-100) at time of recommendation"
+    },
+    "price_at_recommendation": {
+      "type": "number",
+      "description": "Stock price when the recommendation was issued"
+    },
+    "recommendation_type": {
+      "type": "string",
+      "enum": [
+        "Buy",
+        "Watch",
+        "Sell",
+        "No Trade"
+      ],
+      "description": "Type of recommendation"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "evaluated_7d",
+        "evaluated_30d",
+        "final"
+      ],
+      "description": "Evaluation status \u2014 pending until 7/30 day check is done"
+    },
+    "price_7d": {
+      "type": "number",
+      "description": "Stock price 7 days after recommendation (null if not yet evaluated)"
+    },
+    "price_30d": {
+      "type": "number",
+      "description": "Stock price 30 days after recommendation (null if not yet evaluated)"
+    },
+    "result_7d": {
+      "type": "string",
+      "enum": [
+        "win",
+        "loss",
+        "neutral"
+      ],
+      "description": "7-day result: win = profit >3%, loss = loss >3%, neutral = within \u00b13%"
+    },
+    "result_30d": {
+      "type": "string",
+      "enum": [
+        "win",
+        "loss",
+        "neutral"
+      ],
+      "description": "30-day result: win = profit >3%, loss = loss >3%, neutral = within \u00b13%"
+    },
+    "pnl_pct_7d": {
+      "type": "number",
+      "description": "Profit/loss percentage 7 days after recommendation"
+    },
+    "pnl_pct_30d": {
+      "type": "number",
+      "description": "Profit/loss percentage 30 days after recommendation"
+    },
+    "eval_date_7d": {
+      "type": "string",
+      "description": "Date when 7-day evaluation was performed"
+    },
+    "eval_date_30d": {
+      "type": "string",
+      "description": "Date when 30-day evaluation was performed"
+    },
+    "report_id": {
+      "type": "string",
+      "description": "Reference to the DailyReport this recommendation came from"
+    }
+  },
+  "required": [
+    "recommendation_date",
+    "ticker",
+    "score_at_recommendation",
+    "price_at_recommendation",
+    "recommendation_type",
+    "status"
+  ],
+  "type": "object",
+  "name": "RecommendationHistory"
+}

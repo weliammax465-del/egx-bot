@@ -164,9 +164,12 @@ async def cmd_today(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         stocks = scan_all_stocks()
 
         if not stocks:
+            status = get_scan_status()
+            failed = ", ".join(status.failed_sources) if status.failed_sources else "غير محدد"
             await msg.edit_text(
-                "⚠️ لا تتوفر بيانات موثقة اليوم.\n"
-                "قد تكون البورصة مغلقة أو المصدر غير متاح."
+                f"❌ لا توجد بيانات موثوقة كافية اليوم.\n"
+                f"🔍 المصدر الفاشل: {failed}\n"
+                f"⏳ سيتم إعادة المحاولة تلقائيًا."
             )
             return
 
@@ -175,6 +178,11 @@ async def cmd_today(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         ai_summary = explain_analysis(computed_data)
 
         main_msg = build_telegram_message(ai_summary, stocks, market_summary)
+        # Add limited coverage warning if applicable
+        status = get_scan_status()
+        if status.limited_coverage:
+            warning = f"\n⚠️ تغطية محدودة اليوم: {status.coverage_count} سهم فقط بسبب تعذر الوصول للمصدر الرئيسي\n\n"
+            main_msg = warning + main_msg
         await msg.delete()
         await update.message.reply_text(main_msg, parse_mode=ParseMode.MARKDOWN)
 
@@ -430,6 +438,11 @@ async def send_scheduled_report(force: bool = False) -> bool:
 
             # 5. Send to Telegram
             logger.info("Step 5/5: Sending to Telegram...")
+            # Add limited coverage warning if applicable
+            status = get_scan_status()
+            if status.limited_coverage:
+                warning = f"\n⚠️ تغطية محدودة اليوم: {status.coverage_count} سهم فقط بسبب تعذر الوصول للمصدر الرئيسي\n\n"
+                main_msg = warning + main_msg
             await bot.send_message(chat_id=chat_id, text=main_msg, parse_mode=ParseMode.MARKDOWN)
             if len(stocks_msg) > 50:
                 await bot.send_message(chat_id=chat_id, text=stocks_msg, parse_mode=ParseMode.MARKDOWN)

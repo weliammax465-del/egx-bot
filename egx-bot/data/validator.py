@@ -243,8 +243,10 @@ def validate_scraped_price(
     
     Checks:
     - Price is not None, not zero, not NaN/inf
-    - If last_known_price is provided, checks if deviation > 20%
-      (EGX daily limit is ±20%; anything beyond is suspicious)
+    - If last_known_price is provided, checks if deviation > 4%
+      (accounts for natural timing differences between scrapers)
+    - Stocks exceeding 4% deviation: is_valid=True, is_suspicious=True
+      → placed in "Needs Verification" list, excluded from final scoring
     
     Returns ScrapedPriceResult with is_valid, is_suspicious, and reason.
     """
@@ -279,17 +281,22 @@ def validate_scraped_price(
         )
 
     # 5. Deviation check — compare with last known close
+    # Threshold: 4% — accounts for natural timing differences between scrapers
+    # (stockanalysis.com EOD vs tvDatafeed last close).
+    # Stocks exceeding 4% go to "Needs Verification" — not rejected, but excluded from scoring.
+    PRICE_DEVIATION_THRESHOLD = 4.0  # percent
+
     if last_known_price is not None and last_known_price > 0:
         try:
             lkp = float(last_known_price)
             if lkp > 0 and np.isfinite(lkp):
                 deviation_pct = abs(p - lkp) / lkp * 100
-                if deviation_pct > 20.0:
+                if deviation_pct > PRICE_DEVIATION_THRESHOLD:
                     return ScrapedPriceResult(
-                        is_valid=False, is_suspicious=True,
+                        is_valid=True, is_suspicious=True,
                         reason=(
                             f"{ticker}: price {p} deviates {deviation_pct:.1f}% "
-                            f"from last close {lkp} — suspicious (exceeds EGX ±20% limit), excluded"
+                            f"from last close {lkp} — Needs Verification (exceeds {PRICE_DEVIATION_THRESHOLD}% threshold), excluded from scoring"
                         ),
                     )
         except (TypeError, ValueError):
@@ -373,6 +380,10 @@ class ScanStatus:
     total_rejected: int = 0
     suspicious_count: int = 0
     suspicious_tickers: list[str] = field(default_factory=list)
+    needs_verification: list[str] = field(default_factory=list)
+    no_indicators_tickers: list[str] = field(default_factory=list)
+    limited_coverage: bool = False
+    coverage_count: int = 0
     has_reliable_data: bool = False
     last_successful_date: str = ""
 
@@ -383,8 +394,14 @@ class ScanStatus:
             parts.append(f"rejected={self.total_rejected}")
         if self.suspicious_count:
             parts.append(f"suspicious={self.suspicious_count} ({', '.join(self.suspicious_tickers[:5])})")
+        if self.needs_verification:
+            parts.append(f"needs_verification={len(self.needs_verification)} ({', '.join(self.needs_verification[:5])})")
+        if self.no_indicators_tickers:
+            parts.append(f"no_indicators={len(self.no_indicators_tickers)}")
         if self.failed_sources:
             parts.append(f"failed={','.join(self.failed_sources)}")
         if self.used_fallback:
             parts.append(f"fallback_date={self.fallback_date}")
+        if self.limited_coverage:
+            parts.append(f"limited_coverage={self.coverage_count}")
         return " | ".join(parts)

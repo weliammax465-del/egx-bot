@@ -77,20 +77,32 @@ def scrape_egx_stock_list() -> list[dict]:
         error_type = classify_scrape_error(e, "stockanalysis.com")
         logger.error(f"stockanalysis.com scrape failed — error type: {error_type} | {e}")
         last_scan_status.failed_sources.append(f"stockanalysis.com ({error_type})")
-        return _load_fallback_stock_list()
+        last_scan_status.used_fallback = True
+        last_scan_status.limited_coverage = True
+        fallback = _load_fallback_stock_list()
+        last_scan_status.coverage_count = len(fallback)
+        return fallback
 
     soup = BeautifulSoup(r.text, "html.parser")
     table = soup.find("table")
     if not table:
         logger.error("stockanalysis.com: page structure changed — no <table> found")
         last_scan_status.failed_sources.append("stockanalysis.com (page_structure_changed: no table)")
-        return _load_fallback_stock_list()
+        last_scan_status.used_fallback = True
+        last_scan_status.limited_coverage = True
+        fallback = _load_fallback_stock_list()
+        last_scan_status.coverage_count = len(fallback)
+        return fallback
 
     tbody = table.find("tbody")
     if not tbody:
         logger.error("stockanalysis.com: page structure changed — no <tbody> found")
         last_scan_status.failed_sources.append("stockanalysis.com (page_structure_changed: no tbody)")
-        return _load_fallback_stock_list()
+        last_scan_status.used_fallback = True
+        last_scan_status.limited_coverage = True
+        fallback = _load_fallback_stock_list()
+        last_scan_status.coverage_count = len(fallback)
+        return fallback
 
     raw_stocks = []
     for row in tbody.find_all("tr"):
@@ -143,7 +155,11 @@ def scrape_egx_stock_list() -> list[dict]:
 
     if not raw_stocks:
         logger.warning("Scraping returned 0 valid stocks. Using fallback.")
-        return _load_fallback_stock_list()
+        last_scan_status.used_fallback = True
+        last_scan_status.limited_coverage = True
+        fallback = _load_fallback_stock_list()
+        last_scan_status.coverage_count = len(fallback)
+        return fallback
 
     logger.info(f"Scraped {len(raw_stocks)} valid EGX stocks from stockanalysis.com")
     return raw_stocks
@@ -315,21 +331,23 @@ def scan_all_stocks() -> list[StockAnalysis]:
         df = download_stock_history(ticker, n_bars=250, retries=2)
 
         # ── Price deviation check: compare scraped price with last close ──
+        # >4% deviation → "Needs Verification" (not rejected, but excluded from scoring)
+        # Zero/null/NaN → rejected entirely
         if df is not None and len(df) > 0 and live_price > 0:
             last_close = float(df["Close"].iloc[-1])
             price_result = validate_scraped_price(live_price, last_known_price=last_close, ticker=ticker)
             if not price_result.is_valid:
-                if price_result.is_suspicious:
-                    logger.warning(f"  🚫 {ticker}: {price_result.reason}")
-                    last_scan_status.suspicious_count += 1
-                    if ticker not in last_scan_status.suspicious_tickers:
-                        last_scan_status.suspicious_tickers.append(ticker)
-                    rejected_count += 1
-                    continue  # Exclude suspicious stock entirely
-                elif "zero" in price_result.reason or "null" in price_result.reason:
-                    logger.warning(f"  ⚠️ {ticker}: {price_result.reason}")
-                    rejected_count += 1
-                    continue
+                # Rejected entirely (zero/null/NaN)
+                logger.warning(f"  ⚠️ {ticker}: {price_result.reason}")
+                rejected_count += 1
+                continue
+            elif price_result.is_suspicious:
+                # Needs Verification — price deviates >4% from last close
+                logger.warning(f"  🔍 {ticker}: {price_result.reason}")
+                last_scan_status.needs_verification.append(ticker)
+                # Don't compute score, but keep in results for display without recommendation
+                # Will be filtered out from final recommendations
+                continue
 
         # Validate OHLCV data
         freshness = "unknown"
@@ -343,21 +361,13 @@ def scan_all_stocks() -> list[StockAnalysis]:
             if not validation.is_valid:
                 logger.debug(f"  ⚠️ {ticker}: data validation failed — {validation.issues[0] if validation.issues else 'unknown'}")
                 fail_count += 1
-                if live_price > 0:
-                    results.append(StockAnalysis(
-                        ticker=ticker, name=name_en, name_ar=name_ar,
-                        current_price=live_price, daily_change_pct=live_change, volume=0,
-                        data_freshness=freshness, data_quality=data_quality,
-                    ))
+                last_scan_status.no_indicators_tickers.append(ticker)
                 continue
         elif df is None or len(df) < 50:
             fail_count += 1
-            if live_price > 0:
-                results.append(StockAnalysis(
-                    ticker=ticker, name=name_en, name_ar=name_ar,
-                    current_price=live_price, daily_change_pct=live_change, volume=0,
-                    data_freshness="unknown", data_quality=0.3,
-                ))
+            # Exclude entirely from results — no indicators = no recommendation
+            last_scan_status.no_indicators_tickers.append(ticker)
+            logger.debug(f"  ⚠️ {ticker}: no indicators (tvDatafeed returned {len(df) if df is not None else 0} bars)")
             continue
 
         # Compute indicators
@@ -384,12 +394,7 @@ def scan_all_stocks() -> list[StockAnalysis]:
         except Exception as e:
             logger.warning(f"  ❌ {ticker}: analysis failed: {str(e)[:80]}")
             fail_count += 1
-            if live_price > 0:
-                results.append(StockAnalysis(
-                    ticker=ticker, name=name_en, name_ar=name_ar,
-                    current_price=live_price, daily_change_pct=live_change, volume=0,
-                    data_freshness="unknown", data_quality=0.3,
-                ))
+            last_scan_status.no_indicators_tickers.append(ticker)
 
         time.sleep(0.15)
 
@@ -399,7 +404,9 @@ def scan_all_stocks() -> list[StockAnalysis]:
     # Update scan status
     last_scan_status.total_scraped = total
     last_scan_status.total_validated = success_count
+    last_scan_status.coverage_count = success_count
     last_scan_status.has_reliable_data = success_count > 0
+    last_scan_status.source = "stockanalysis.com" if not last_scan_status.used_fallback else "egx_stocks.json (fallback)"
     logger.info(f"Scan complete: {success_count} analyzed, {fail_count} failed, {rejected_count} rejected, {total} total")
     logger.info(f"Scan status: {last_scan_status.summary()}")
 

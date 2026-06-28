@@ -934,17 +934,32 @@ class TestEdgeCases:
         assert r.is_valid is False
 
     def test_validate_scraped_price_suspicious_deviation(self):
-        """Price deviating >20% from last close should be flagged suspicious."""
+        """Price deviating >4% from last close should be flagged Needs Verification (is_valid=True, is_suspicious=True)."""
         from data.validator import validate_scraped_price
         r = validate_scraped_price(150.0, last_known_price=100.0, ticker="TEST")
-        assert r.is_valid is False
+        assert r.is_valid is True  # Not rejected — goes to Needs Verification
         assert r.is_suspicious is True
         assert "deviat" in r.reason.lower()
+        assert "needs verification" in r.reason.lower()
 
     def test_validate_scraped_price_acceptable_deviation(self):
-        """Price within 20% of last close should pass."""
+        """Price within 4% of last close should pass as valid (not suspicious)."""
         from data.validator import validate_scraped_price
-        r = validate_scraped_price(115.0, last_known_price=100.0, ticker="TEST")
+        r = validate_scraped_price(103.0, last_known_price=100.0, ticker="TEST")
+        assert r.is_valid is True
+        assert r.is_suspicious is False
+
+    def test_validate_scraped_price_just_over_threshold(self):
+        """Price at exactly 5% deviation should be flagged Needs Verification."""
+        from data.validator import validate_scraped_price
+        r = validate_scraped_price(105.0, last_known_price=100.0, ticker="TEST")
+        assert r.is_valid is True
+        assert r.is_suspicious is True
+
+    def test_validate_scraped_price_just_under_threshold(self):
+        """Price at exactly 3% deviation should pass as valid."""
+        from data.validator import validate_scraped_price
+        r = validate_scraped_price(103.0, last_known_price=100.0, ticker="TEST")
         assert r.is_valid is True
         assert r.is_suspicious is False
 
@@ -991,12 +1006,19 @@ class TestEdgeCases:
         s.total_validated = 180
         s.suspicious_count = 2
         s.suspicious_tickers = ["COMI", "SWDY"]
+        s.needs_verification = ["ETEL", "JUFO"]
+        s.no_indicators_tickers = ["MFPC"]
         s.failed_sources = ["tradingeconomics.com (timeout)"]
+        s.limited_coverage = True
+        s.coverage_count = 20
         summary = s.summary()
         assert "stockanalysis.com" in summary
         assert "224" in summary
         assert "suspicious=2" in summary
+        assert "needs_verification=2" in summary
+        assert "no_indicators=1" in summary
         assert "tradingeconomics.com" in summary
+        assert "limited_coverage=20" in summary
 
     def test_load_last_report_nonexistent(self):
         """Loading a non-existent report cache should return None."""
