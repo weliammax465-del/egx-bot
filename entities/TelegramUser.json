@@ -1,0 +1,31 @@
+{
+  "properties": {
+    "chat_id": {
+      "type": "string",
+      "description": "Telegram chat ID for message delivery"
+    },
+    "username": {
+      "type": "string",
+      "description": "Telegram username"
+    },
+    "first_name": {
+      "type": "string",
+      "description": "User's first name from Telegram"
+    },
+    "is_active": {
+      "type": "boolean",
+      "description": "Whether the user should receive daily reports"
+    },
+    "language": {
+      "type": "string",
+      "default": "ar",
+      "description": "Preferred language for reports"
+    }
+  },
+  "required": [
+    "chat_id",
+    "is_active"
+  ],
+  "type": "object",
+  "name": "TelegramUser"
+}

@@ -1,0 +1,76 @@
+{
+  "properties": {
+    "report_date": {
+      "type": "string",
+      "description": "YYYY-MM-DD \u2014 the trading day this report covers"
+    },
+    "ai_summary": {
+      "type": "string",
+      "description": "Gemini-generated Arabic technical analysis"
+    },
+    "stocks_table": {
+      "type": "string",
+      "description": "Formatted stocks table with scores and recommendations"
+    },
+    "market_index_value": {
+      "type": "string",
+      "description": "EGX 30 index value"
+    },
+    "market_change": {
+      "type": "string",
+      "description": "Daily change value"
+    },
+    "market_change_pct": {
+      "type": "string",
+      "description": "Daily change percentage"
+    },
+    "stocks_count": {
+      "type": "number",
+      "description": "Total stocks analyzed"
+    },
+    "buy_count": {
+      "type": "number",
+      "description": "Number of buy signals"
+    },
+    "watch_count": {
+      "type": "number",
+      "description": "Number of watch signals"
+    },
+    "sell_count": {
+      "type": "number",
+      "description": "Number of sell signals"
+    },
+    "no_trade_count": {
+      "type": "number",
+      "description": "Number of no-trade stocks"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "generated",
+        "sent",
+        "failed"
+      ],
+      "description": "Report delivery status"
+    },
+    "source": {
+      "type": "string",
+      "description": "Data source (e.g. Trading Economics)"
+    },
+    "sent_count": {
+      "type": "number",
+      "description": "Number of users the report was sent to"
+    },
+    "error_message": {
+      "type": "string",
+      "description": "Error details if status is failed"
+    }
+  },
+  "required": [
+    "report_date",
+    "ai_summary",
+    "status"
+  ],
+  "type": "object",
+  "name": "DailyReport"
+}
