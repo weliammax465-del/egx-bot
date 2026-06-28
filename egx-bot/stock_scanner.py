@@ -28,11 +28,19 @@ from bs4 import BeautifulSoup
 from indicators import StockAnalysis, analyze_stock
 from scoring import compute_score
 from data.symbols import normalize_symbol, is_valid_egx_symbol, get_arabic_name, get_canonical_name, update_canonical_list
-from data.validator import validate_ohlcv, validate_price, deduplicate_stocks
+from data.validator import (
+    validate_ohlcv, validate_price, validate_scraped_price,
+    classify_scrape_error, check_scraper_freshness, deduplicate_stocks,
+    ScanStatus,
+)
 
 logger = logging.getLogger(__name__)
 
 STOCKANALYSIS_URL = "https://stockanalysis.com/list/egyptian-stock-exchange/"
+LAST_REPORT_FILE = os.path.join(os.path.dirname(__file__), ".egx_last_report.json")
+
+# Module-level scan status — accessible after scan_all_stocks()
+last_scan_status = ScanStatus()
 FALLBACK_STOCKS_FILE = os.path.join(os.path.dirname(__file__), "egx_stocks.json")
 
 
@@ -55,6 +63,7 @@ def scrape_egx_stock_list() -> list[dict]:
     Scrape the full EGX stock list from stockanalysis.com.
     Validates every symbol against the canonical EGX list.
     Falls back to egx_stocks.json if scraping fails.
+    Classifies errors precisely: page structure change, timeout, no response, etc.
     """
     headers = {
         "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
@@ -65,18 +74,22 @@ def scrape_egx_stock_list() -> list[dict]:
         r = requests.get(STOCKANALYSIS_URL, headers=headers, timeout=15)
         r.raise_for_status()
     except Exception as e:
-        logger.error(f"Failed to scrape stockanalysis.com: {e}")
+        error_type = classify_scrape_error(e, "stockanalysis.com")
+        logger.error(f"stockanalysis.com scrape failed — error type: {error_type} | {e}")
+        last_scan_status.failed_sources.append(f"stockanalysis.com ({error_type})")
         return _load_fallback_stock_list()
 
     soup = BeautifulSoup(r.text, "html.parser")
     table = soup.find("table")
     if not table:
-        logger.error("No table found on stockanalysis.com page")
+        logger.error("stockanalysis.com: page structure changed — no <table> found")
+        last_scan_status.failed_sources.append("stockanalysis.com (page_structure_changed: no table)")
         return _load_fallback_stock_list()
 
     tbody = table.find("tbody")
     if not tbody:
-        logger.error("No tbody found in table")
+        logger.error("stockanalysis.com: page structure changed — no <tbody> found")
+        last_scan_status.failed_sources.append("stockanalysis.com (page_structure_changed: no tbody)")
         return _load_fallback_stock_list()
 
     raw_stocks = []
@@ -104,14 +117,23 @@ def scrape_egx_stock_list() -> list[dict]:
             except (ValueError, TypeError):
                 pass
 
-            if symbol and symbol != "NO." and validate_price(price):
-                raw_stocks.append({
-                    "symbol": symbol,
-                    "name": name,
-                    "price": price,
-                    "change_pct": change_pct,
-                    "market_cap_str": market_cap_str,
-                })
+            if symbol and symbol != "NO.":
+                # Rigorous price validation — reject zero/null/NaN
+                price_result = validate_scraped_price(price, ticker=symbol)
+                if price_result.is_valid:
+                    raw_stocks.append({
+                        "symbol": symbol,
+                        "name": name,
+                        "price": price,
+                        "change_pct": change_pct,
+                        "market_cap_str": market_cap_str,
+                    })
+                else:
+                    logger.warning(f"  ⚠️ {symbol}: {price_result.reason}")
+                    last_scan_status.total_rejected += 1
+                    if price_result.is_suspicious:
+                        last_scan_status.suspicious_count += 1
+                        last_scan_status.suspicious_tickers.append(symbol)
 
     # Deduplicate
     raw_stocks = deduplicate_stocks(raw_stocks)
@@ -162,10 +184,13 @@ def download_stock_history(ticker: str, n_bars: int = 250, retries: int = 2) -> 
             else:
                 return None
         except Exception as e:
+            error_type = classify_scrape_error(e, "TradingView")
             if attempt < retries:
                 time.sleep(2 * (attempt + 1))
             else:
-                logger.warning(f"TradingView failed for {ticker} after {retries+1} attempts: {str(e)[:80]}")
+                logger.warning(f"TradingView failed for {ticker} after {retries+1} attempts — error type: {error_type} | {str(e)[:80]}")
+                if error_type == "insufficient_data" or (df is not None and len(df) < 50):
+                    logger.info(f"  {ticker}: insufficient historical data ({len(df) if df is not None else 0} bars, need 50)")
                 return None
     return None
 
@@ -289,6 +314,23 @@ def scan_all_stocks() -> list[StockAnalysis]:
         # Download historical data
         df = download_stock_history(ticker, n_bars=250, retries=2)
 
+        # ── Price deviation check: compare scraped price with last close ──
+        if df is not None and len(df) > 0 and live_price > 0:
+            last_close = float(df["Close"].iloc[-1])
+            price_result = validate_scraped_price(live_price, last_known_price=last_close, ticker=ticker)
+            if not price_result.is_valid:
+                if price_result.is_suspicious:
+                    logger.warning(f"  🚫 {ticker}: {price_result.reason}")
+                    last_scan_status.suspicious_count += 1
+                    if ticker not in last_scan_status.suspicious_tickers:
+                        last_scan_status.suspicious_tickers.append(ticker)
+                    rejected_count += 1
+                    continue  # Exclude suspicious stock entirely
+                elif "zero" in price_result.reason or "null" in price_result.reason:
+                    logger.warning(f"  ⚠️ {ticker}: {price_result.reason}")
+                    rejected_count += 1
+                    continue
+
         # Validate OHLCV data
         freshness = "unknown"
         data_quality = 0.5
@@ -353,9 +395,51 @@ def scan_all_stocks() -> list[StockAnalysis]:
 
     results.sort(key=lambda x: x.composite_score, reverse=True)
     _set_cached_scan(results)
+
+    # Update scan status
+    last_scan_status.total_scraped = total
+    last_scan_status.total_validated = success_count
+    last_scan_status.has_reliable_data = success_count > 0
     logger.info(f"Scan complete: {success_count} analyzed, {fail_count} failed, {rejected_count} rejected, {total} total")
+    logger.info(f"Scan status: {last_scan_status.summary()}")
+
+    if success_count == 0:
+        logger.error(f"No stocks passed validation. Failed sources: {last_scan_status.failed_sources}")
+
     return results
 
+
+
+# ─── Last Report Cache (fallback when today's scan fails) ────────────────────
+
+def save_last_report(report_data: dict) -> None:
+    """Save the last successful report data for fallback use."""
+    try:
+        with open(LAST_REPORT_FILE, "w", encoding="utf-8") as f:
+            json.dump(report_data, f, ensure_ascii=False, indent=2)
+        logger.info(f"Saved last report cache to {LAST_REPORT_FILE}")
+    except Exception as e:
+        logger.warning(f"Could not save last report cache: {e}")
+
+
+def load_last_report() -> dict | None:
+    """Load the last successful report for fallback."""
+    try:
+        with open(LAST_REPORT_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            logger.info(f"Loaded last report cache from {LAST_REPORT_FILE} (date: {data.get('date', 'unknown')})")
+            return data
+    except FileNotFoundError:
+        logger.info("No last report cache found.")
+        return None
+    except Exception as e:
+        logger.warning(f"Could not load last report cache: {e}")
+        return None
+
+
+def get_scan_status() -> ScanStatus:
+    """Return the status of the last scan operation."""
+    return last_scan_status
 
 # ─── Ranking Helpers ─────────────────────────────────────────────────────────
 

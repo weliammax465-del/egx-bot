@@ -41,6 +41,7 @@ from stock_scanner import (
     scan_all_stocks, format_analysis_for_ai,
     get_buy_signals, get_watchlist,
     scan_single_stock,
+    get_scan_status, load_last_report, save_last_report,
 )
 from ai_report import (
     explain_analysis, build_telegram_message, build_stocks_table_message,
@@ -386,11 +387,34 @@ async def send_scheduled_report(force: bool = False) -> bool:
             stocks = scan_all_stocks()
 
             if not stocks:
-                await bot.send_message(
-                    chat_id=chat_id,
-                    text="⚪ لا تتوفر بيانات موثقة اليوم. قد تكون البورصة مغلقة.",
-                )
-                logger.warning("No stocks data available. Sent notification to user.")
+                # Get detailed failure info
+                status = get_scan_status()
+                failed_sources = ", ".join(status.failed_sources) if status.failed_sources else "غير محدد"
+                
+                # Try to use last successful report as fallback
+                last_report = load_last_report()
+                if last_report and last_report.get("ai_summary"):
+                    fallback_date = last_report.get("date", "غير محدد")
+                    fallback_msg = (
+                        f"⚠️ تعذّر الحصول على بيانات جديدة اليوم.\n"
+                        f"📋 يتم عرض آخر تقرير ناجح من يوم {fallback_date}.\n"
+                        f"🔍 سبب الفشل: {failed_sources}\n\n"
+                        f"{last_report.get('ai_summary', '')[:3000]}"
+                    )
+                    await bot.send_message(chat_id=chat_id, text=fallback_msg)
+                    if last_report.get("stocks_table"):
+                        await bot.send_message(chat_id=chat_id, text=last_report["stocks_table"][:3800])
+                    logger.warning(f"No new data. Sent fallback report from {fallback_date}. Failed: {failed_sources}")
+                else:
+                    await bot.send_message(
+                        chat_id=chat_id,
+                        text=(
+                            f"❌ لا توجد بيانات موثوقة كافية اليوم.\n"
+                            f"🔍 المصدر الفاشل: {failed_sources}\n"
+                            f"⏳ سيتم إعادة المحاولة تلقائيًا."
+                        ),
+                    )
+                    logger.warning(f"No data and no fallback. Failed sources: {failed_sources}")
                 return False
 
             # 3. Generate AI explanation
@@ -409,6 +433,15 @@ async def send_scheduled_report(force: bool = False) -> bool:
             await bot.send_message(chat_id=chat_id, text=main_msg, parse_mode=ParseMode.MARKDOWN)
             if len(stocks_msg) > 50:
                 await bot.send_message(chat_id=chat_id, text=stocks_msg, parse_mode=ParseMode.MARKDOWN)
+
+            # Save report for future fallback
+            save_last_report({
+                "date": datetime.now(CAIRO_TZ).strftime("%Y-%m-%d"),
+                "ai_summary": ai_summary,
+                "stocks_table": stocks_msg if len(stocks_msg) > 50 else "",
+                "market_value": str(market_summary.current_value) if market_summary else "N/A",
+                "market_change": str(market_summary.change) if market_summary else "N/A",
+            })
 
             # Mark as sent — prevents duplicates on retry
             _mark_sent_today()

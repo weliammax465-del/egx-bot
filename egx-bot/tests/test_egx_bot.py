@@ -900,3 +900,124 @@ class TestEdgeCases:
         # Check that no consistency warning was raised
         consistency_issues = [i for i in result.issues if "inconsistent" in i.lower()]
         assert len(consistency_issues) == 0, f"Good data should have no consistency issues: {consistency_issues}"
+
+
+    # ── Stage 1: Data Validation Layer Tests ──
+
+    def test_validate_scraped_price_valid(self):
+        """Valid price should pass."""
+        from data.validator import validate_scraped_price
+        r = validate_scraped_price(150.0, ticker="COMI")
+        assert r.is_valid is True
+        assert r.is_suspicious is False
+        assert r.status == "valid"
+
+    def test_validate_scraped_price_zero(self):
+        """Zero price should be rejected."""
+        from data.validator import validate_scraped_price
+        r = validate_scraped_price(0.0, ticker="TEST")
+        assert r.is_valid is False
+        assert "zero" in r.reason.lower()
+
+    def test_validate_scraped_price_none(self):
+        """None price should be rejected."""
+        from data.validator import validate_scraped_price
+        r = validate_scraped_price(None, ticker="TEST")
+        assert r.is_valid is False
+        assert "null" in r.reason.lower()
+
+    def test_validate_scraped_price_nan(self):
+        """NaN price should be rejected."""
+        from data.validator import validate_scraped_price
+        import math
+        r = validate_scraped_price(float('nan'), ticker="TEST")
+        assert r.is_valid is False
+
+    def test_validate_scraped_price_suspicious_deviation(self):
+        """Price deviating >20% from last close should be flagged suspicious."""
+        from data.validator import validate_scraped_price
+        r = validate_scraped_price(150.0, last_known_price=100.0, ticker="TEST")
+        assert r.is_valid is False
+        assert r.is_suspicious is True
+        assert "deviat" in r.reason.lower()
+
+    def test_validate_scraped_price_acceptable_deviation(self):
+        """Price within 20% of last close should pass."""
+        from data.validator import validate_scraped_price
+        r = validate_scraped_price(115.0, last_known_price=100.0, ticker="TEST")
+        assert r.is_valid is True
+        assert r.is_suspicious is False
+
+    def test_classify_scrape_error_timeout(self):
+        """Timeout errors should be classified correctly."""
+        from data.validator import classify_scrape_error
+        assert classify_scrape_error(Exception("Connection timed out")) == "timeout"
+        assert classify_scrape_error(Exception("Request timeout")) == "timeout"
+
+    def test_classify_scrape_error_no_response(self):
+        """Connection errors should be classified as no_response."""
+        from data.validator import classify_scrape_error
+        assert classify_scrape_error(Exception("Connection refused")) == "no_response"
+        assert classify_scrape_error(Exception("Host unreachable")) == "no_response"
+
+    def test_classify_scrape_error_page_structure(self):
+        """Missing table errors should be classified as page_structure_changed."""
+        from data.validator import classify_scrape_error
+        assert classify_scrape_error(Exception("No table found")) == "page_structure_changed"
+        assert classify_scrape_error(Exception("EGX 30 not found")) == "page_structure_changed"
+
+    def test_classify_scrape_error_auth(self):
+        """401/403 errors should be classified as auth_failure."""
+        from data.validator import classify_scrape_error
+        assert classify_scrape_error(Exception("401 Unauthorized")) == "auth_failure"
+        assert classify_scrape_error(Exception("403 Forbidden")) == "auth_failure"
+
+    def test_classify_scrape_error_rate_limited(self):
+        """429 errors should be classified as rate_limited."""
+        from data.validator import classify_scrape_error
+        assert classify_scrape_error(Exception("429 Too Many Requests")) == "rate_limited"
+
+    def test_classify_scrape_error_unknown(self):
+        """Unclassifiable errors should return 'unknown'."""
+        from data.validator import classify_scrape_error
+        assert classify_scrape_error(Exception("Something weird happened")) == "unknown"
+
+    def test_scan_status_dataclass(self):
+        """ScanStatus should track all relevant fields."""
+        from data.validator import ScanStatus
+        s = ScanStatus()
+        s.source = "stockanalysis.com"
+        s.total_scraped = 224
+        s.total_validated = 180
+        s.suspicious_count = 2
+        s.suspicious_tickers = ["COMI", "SWDY"]
+        s.failed_sources = ["tradingeconomics.com (timeout)"]
+        summary = s.summary()
+        assert "stockanalysis.com" in summary
+        assert "224" in summary
+        assert "suspicious=2" in summary
+        assert "tradingeconomics.com" in summary
+
+    def test_load_last_report_nonexistent(self):
+        """Loading a non-existent report cache should return None."""
+        from stock_scanner import load_last_report
+        # Ensure file doesn't exist
+        import os
+        if os.path.exists(".egx_last_report.json"):
+            os.remove(".egx_last_report.json")
+        result = load_last_report()
+        assert result is None
+
+    def test_save_and_load_last_report(self):
+        """Saving and loading a report cache should round-trip correctly."""
+        from stock_scanner import save_last_report, load_last_report
+        import os
+        test_data = {"date": "2026-06-28", "ai_summary": "test summary", "stocks_table": "table"}
+        save_last_report(test_data)
+        loaded = load_last_report()
+        assert loaded is not None
+        assert loaded["date"] == "2026-06-28"
+        assert loaded["ai_summary"] == "test summary"
+        # Cleanup
+        if os.path.exists(".egx_last_report.json"):
+            os.remove(".egx_last_report.json")

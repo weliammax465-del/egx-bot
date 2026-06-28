@@ -34,3 +34,4 @@ Thumbs.db
 .coverage
 htmlcov/
 .egx_sent_today
+.egx_last_report.json

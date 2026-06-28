@@ -17,6 +17,8 @@ from dataclasses import dataclass, field
 from typing import Optional
 import logging
 
+from data.validator import classify_scrape_error
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -89,7 +91,8 @@ def fetch_egx30_index() -> dict:
     """
     resp = _safe_get(TRADING_ECONOMICS_URL)
     if not resp:
-        return {}
+        logger.error("Trading Economics: no response after retries — classified as 'no_response'")
+        return {"_error": "no_response", "_source": "tradingeconomics.com"}
 
     soup = BeautifulSoup(resp.text, "html.parser")
     data = {}
@@ -118,6 +121,12 @@ def fetch_egx30_index() -> dict:
                     if len(cells) >= 8:
                         data["date_str"] = cells[7].get_text(strip=True)
 
+                    # Validate that we got actual numbers, not empty strings
+                    parsed_value = _parse_number(data.get("value", ""))
+                    if parsed_value is None or parsed_value <= 0:
+                        logger.warning(f"Trading Economics: EGX 30 value is invalid: '{data.get('value', '')}'")
+                        return {"_error": "invalid_data", "_source": "tradingeconomics.com"}
+
                     # Determine direction from change value
                     change_val = _parse_number(data.get("change", "0"))
                     if change_val is not None:
@@ -136,11 +145,13 @@ def fetch_egx30_index() -> dict:
                     )
                     return data
 
-        logger.warning("EGX 30 row not found in Trading Economics tables.")
+        # If we got here, the page loaded but EGX 30 row wasn't found
+        logger.warning("Trading Economics: page structure changed — EGX 30 row not found in tables")
+        return {"_error": "page_structure_changed", "_source": "tradingeconomics.com"}
     except Exception as e:
-        logger.warning(f"Error parsing Trading Economics page: {e}")
-
-    return data
+        error_type = classify_scrape_error(e, "tradingeconomics.com")
+        logger.warning(f"Trading Economics: error parsing page — type: {error_type} | {e}")
+        return {"_error": error_type, "_source": "tradingeconomics.com"}
 
 
 def build_market_summary() -> MarketSummary:

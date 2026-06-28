@@ -212,3 +212,179 @@ def deduplicate_stocks(stocks: list[dict]) -> list[dict]:
             seen.add(sym)
             result.append(s)
     return result
+
+
+# ─── Stage 1: Enhanced Data Validation ───────────────────────────────────────
+# These functions add rigorous post-scrape validation and error classification.
+
+@dataclass
+class ScrapedPriceResult:
+    """Result of validating a scraped stock price."""
+    is_valid: bool
+    is_suspicious: bool
+    reason: str = ""
+
+    @property
+    def status(self) -> str:
+        if not self.is_valid:
+            return "rejected"
+        if self.is_suspicious:
+            return "suspicious"
+        return "valid"
+
+
+def validate_scraped_price(
+    price: float | None,
+    last_known_price: float | None = None,
+    ticker: str = "",
+) -> ScrapedPriceResult:
+    """
+    Validate a scraped stock price with deviation check.
+    
+    Checks:
+    - Price is not None, not zero, not NaN/inf
+    - If last_known_price is provided, checks if deviation > 20%
+      (EGX daily limit is ±20%; anything beyond is suspicious)
+    
+    Returns ScrapedPriceResult with is_valid, is_suspicious, and reason.
+    """
+    # 1. Null/None check
+    if price is None:
+        return ScrapedPriceResult(
+            is_valid=False, is_suspicious=False,
+            reason=f"{ticker}: price is null/None — rejected",
+        )
+
+    # 2. Numeric check
+    try:
+        p = float(price)
+    except (TypeError, ValueError):
+        return ScrapedPriceResult(
+            is_valid=False, is_suspicious=False,
+            reason=f"{ticker}: price '{price}' is not numeric — rejected",
+        )
+
+    # 3. Zero or negative
+    if p <= 0:
+        return ScrapedPriceResult(
+            is_valid=False, is_suspicious=False,
+            reason=f"{ticker}: price {p} is zero or negative — rejected",
+        )
+
+    # 4. NaN/inf
+    if not np.isfinite(p):
+        return ScrapedPriceResult(
+            is_valid=False, is_suspicious=False,
+            reason=f"{ticker}: price {p} is not finite (NaN/inf) — rejected",
+        )
+
+    # 5. Deviation check — compare with last known close
+    if last_known_price is not None and last_known_price > 0:
+        try:
+            lkp = float(last_known_price)
+            if lkp > 0 and np.isfinite(lkp):
+                deviation_pct = abs(p - lkp) / lkp * 100
+                if deviation_pct > 20.0:
+                    return ScrapedPriceResult(
+                        is_valid=False, is_suspicious=True,
+                        reason=(
+                            f"{ticker}: price {p} deviates {deviation_pct:.1f}% "
+                            f"from last close {lkp} — suspicious (exceeds EGX ±20% limit), excluded"
+                        ),
+                    )
+        except (TypeError, ValueError):
+            pass  # Can't compare, accept the price
+
+    return ScrapedPriceResult(is_valid=True, is_suspicious=False, reason="")
+
+
+def classify_scrape_error(error: Exception, source: str = "") -> str:
+    """
+    Classify a scraping/downloading error into a specific type.
+    Returns one of: 'timeout', 'no_response', 'page_structure_changed',
+    'auth_failure', 'rate_limited', 'insufficient_data', 'unknown'.
+    """
+    err_str = str(error).lower()
+
+    if "timeout" in err_str or "timed out" in err_str:
+        return "timeout"
+    if "connection" in err_str or "refused" in err_str or "unreachable" in err_str:
+        return "no_response"
+    if "401" in err_str or "403" in err_str or "unauthorized" in err_str or "forbidden" in err_str:
+        return "auth_failure"
+    if "429" in err_str or "rate" in err_str or "too many" in err_str:
+        return "rate_limited"
+    if "no table" in err_str or "no tbody" in err_str or "not found" in err_str:
+        return "page_structure_changed"
+    if "insufficient" in err_str or "not enough" in err_str:
+        return "insufficient_data"
+
+    return "unknown"
+
+
+def check_scraper_freshness(date_str: str | None) -> tuple[bool, str]:
+    """
+    Check if scraper data is fresh enough based on a date string.
+    Returns (is_fresh, reason).
+    """
+    if not date_str:
+        return False, "no date available from scraper"
+
+    try:
+        # Try common date formats
+        from datetime import datetime as dt
+        for fmt in ("%Y-%m-%d", "%b %d %Y", "%B %d %Y", "%d/%m/%Y", "%m/%d/%Y"):
+            try:
+                scraped_date = dt.strptime(date_str.strip(), fmt)
+                break
+            except ValueError:
+                continue
+        else:
+            return False, f"could not parse date '{date_str}'"
+
+        now = dt.now(timezone.utc)
+        if scraped_date.tzinfo is None:
+            scraped_date = scraped_date.replace(tzinfo=timezone.utc)
+
+        age_hours = (now - scraped_date).total_seconds() / 3600
+        if age_hours < 0:
+            return True, "data is from today or future"
+        if age_hours < FRESH_THRESHOLD_HOURS:
+            return True, f"data is {age_hours:.0f}h old (fresh)"
+        if age_hours < STALE_THRESHOLD_HOURS:
+            return False, f"data is {age_hours:.0f}h old (stale, exceeds {FRESH_THRESHOLD_HOURS}h threshold)"
+        return False, f"data is {age_hours:.0f}h old (very stale)"
+
+    except Exception as e:
+        return False, f"freshness check failed: {e}"
+
+
+@dataclass
+class ScanStatus:
+    """Tracks the status of the last scan operation for reporting."""
+    source: str = "unknown"
+    failed_sources: list[str] = field(default_factory=list)
+    error_type: str = ""  # classified error type
+    error_detail: str = ""
+    used_fallback: bool = False
+    fallback_date: str = ""
+    total_scraped: int = 0
+    total_validated: int = 0
+    total_rejected: int = 0
+    suspicious_count: int = 0
+    suspicious_tickers: list[str] = field(default_factory=list)
+    has_reliable_data: bool = False
+    last_successful_date: str = ""
+
+    def summary(self) -> str:
+        """Human-readable summary for logging."""
+        parts = [f"source={self.source}", f"scraped={self.total_scraped}", f"validated={self.total_validated}"]
+        if self.total_rejected:
+            parts.append(f"rejected={self.total_rejected}")
+        if self.suspicious_count:
+            parts.append(f"suspicious={self.suspicious_count} ({', '.join(self.suspicious_tickers[:5])})")
+        if self.failed_sources:
+            parts.append(f"failed={','.join(self.failed_sources)}")
+        if self.used_fallback:
+            parts.append(f"fallback_date={self.fallback_date}")
+        return " | ".join(parts)
