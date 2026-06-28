@@ -89,7 +89,6 @@ jobs:
           exit 1
         timeout-minutes: 25
 
-
       # ── Save Recommendations JSON ─────────────────────────────────
       # Commit the recommendations JSON file for performance tracking.
       # A Base44 automation reads this file to save recommendations
@@ -110,27 +109,30 @@ jobs:
           fi
         continue-on-error: true
 
-      # ── Failure Notification ──────────────────────────────────────
-      - name: Notify on failure
+      # ── Telegram Failure Notification ─────────────────────────────
+      # Replaces the old SMTP email notification (which was never configured).
+      # Sends a direct Telegram message if ALL retry attempts failed.
+      - name: Notify on Telegram failure
         if: failure() && steps.check-sent.outputs.cache-hit != 'true'
-        uses: dawidd6/action-send-mail@v3.8.0
-        with:
-          server-address: smtp.gmail.com
-          server-port: 465
-          username: ${{ secrets.SMTP_USER }}
-          password: ${{ secrets.SMTP_PASS }}
-          subject: "❌ EGX Bot — Daily Report Failed"
-          to: ${{ secrets.NOTIFY_EMAIL }}
-          from: EGX Bot
-          body: |
-            The EGX Daily Technical Analysis workflow has failed
-            after 3 automatic retry attempts.
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          MSG="❌ EGX Bot — فشل التقرير اليومي بعد 3 محاولات
 
-            Date: ${{ steps.date.outputs.today }}
-            Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+التاريخ: ${{ steps.date.outputs.today }}
+التفاصيل: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-            Please check:
-            1. Telegram Bot Token is valid
-            2. Gemini API key has quota
-            3. TradingView/data sources are accessible
+تحقق من:
+• صلاحية Telegram Bot Token
+• صلاحية Gemini API Key
+• مصادر البيانات (TradingView/stockanalysis.com)
+
+نظام المراقبة Base44 ستحاول إعادة التشغيل تلقائياً خلال 15 دقيقة."
+
+          curl -s -X POST \
+            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=${MSG}" \
+            > /dev/null 2>&1 || true
         continue-on-error: true
