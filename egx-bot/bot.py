@@ -24,6 +24,7 @@ Scheduled:
 """
 
 import os
+import re
 import sys
 import time
 import logging
@@ -37,7 +38,7 @@ from telegram.constants import ParseMode
 from fetch_egx import build_market_summary, format_summary_text
 from stock_scanner import (
     scan_all_stocks, format_analysis_for_ai,
-    get_buy_signals, get_watchlist, get_single_stock,
+    get_buy_signals, get_watchlist,
     scan_single_stock,
 )
 from ai_report import (
@@ -73,7 +74,6 @@ def _sanitize_error(e: Exception, token: str = "") -> str:
     if token:
         msg = msg.replace(token, "[REDACTED]")
     # Also redact any pattern that looks like a bot token (digits:alphanumeric)
-    import re
     msg = re.sub(r'\d{8,12}:[A-Za-z0-9_-]{30,}', '[REDACTED]', msg)
     return msg
 
@@ -205,7 +205,7 @@ async def cmd_watchlist(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     if not _check_cooldown(update.effective_chat.id):
         await update.message.reply_text("⏳ يرجى الانتظار 30 ثانية بين الأوامر.")
         return
-    msg = await update.message.reply_text("⏳ جاري مسح الأسهم وغير التوصيات…")
+    msg = await update.message.reply_text("⏳ جاري مسح الأسهم وتحديد التوصيات…")
 
     try:
         stocks = scan_all_stocks()
@@ -274,6 +274,9 @@ async def cmd_watchlist(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 async def cmd_stock(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Detailed analysis for a specific stock: /stock COMI"""
+    if not _check_cooldown(update.effective_chat.id):
+        await update.message.reply_text("⏳ يرجى الانتظار بين الأوامر.")
+        return
     if not context.args:
         await update.message.reply_text(
             "📋 استخدم: `/stock SYMBOL`\n"

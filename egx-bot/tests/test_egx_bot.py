@@ -813,3 +813,90 @@ class TestEdgeCases:
         # scoring_result is None by default
         detail = format_stock_detail(a)
         assert "TEST" in detail or "تجربة" in detail
+
+
+    # ── Regression: breakout scoring must use signal, not text ──
+
+    def test_breakout_scoring_uses_signal_not_text(self, sample_ohlcv):
+        """Regression: _score_breakout checked English 'bullish' in Arabic text — never matched."""
+        from indicators import analyze_stock, IndicatorResult
+        from scoring import _score_breakout
+        
+        # Create a stock with a bullish breakout signal
+        a = analyze_stock(sample_ohlcv, "T", "T", "ت")
+        # Replace existing Breakout indicator with bullish signal
+        for i, ind in enumerate(a.indicators):
+            if ind.name == "Breakout":
+                a.indicators[i] = IndicatorResult(
+                    "Breakout", "الاختراق", 100.0, 1, "صاعد", "اختراق مقاومة بتأكيد حجمي"
+                )
+                break
+        factor = _score_breakout(a)
+        # Score should increase for bullish breakout (was always 50 before fix)
+        assert factor.raw_score > 50, f"Bullish breakout should score > 50, got {factor.raw_score}"
+        assert "اختراق" in factor.reason
+
+    def test_breakout_scoring_bearish_signal(self, sample_ohlcv):
+        """Bearish breakout (signal=-1) should decrease score."""
+        from indicators import analyze_stock, IndicatorResult
+        from scoring import _score_breakout
+        
+        a = analyze_stock(sample_ohlcv, "T", "T", "ت")
+        # Replace existing Breakout indicator (not append — _get_indicator returns first match)
+        for i, ind in enumerate(a.indicators):
+            if ind.name == "Breakout":
+                a.indicators[i] = IndicatorResult(
+                    "Breakout", "الاختراق", 100.0, -1, "هابط", "كسر دعم بتأكيد حجمي"
+                )
+                break
+        factor = _score_breakout(a)
+        assert factor.raw_score < 50, f"Bearish breakout should score < 50, got {factor.raw_score}"
+        assert "كسر" in factor.reason
+
+    def test_scoring_no_text_matching_for_breakout(self, sample_ohlcv):
+        """Full scoring: breakout with Arabic note should affect total score."""
+        from indicators import analyze_stock, IndicatorResult
+        from scoring import compute_score
+        
+        a = analyze_stock(sample_ohlcv, "T", "T", "ت")
+        # Add bullish breakout
+        a.indicators.append(IndicatorResult(
+            "Breakout", "الاختراق", 100.0, 1, "صاعد", "اختراق مقاومة"
+        ))
+        score_with_breakout = compute_score(a, "fresh", 0.9).total_score
+        
+        # Add bearish breakout instead
+        b = analyze_stock(sample_ohlcv, "T", "T", "ت")
+        b.indicators.append(IndicatorResult(
+            "Breakout", "الاختراق", 100.0, -1, "هابط", "كسر دعم"
+        ))
+        score_with_breakdown = compute_score(b, "fresh", 0.9).total_score
+        
+        assert score_with_breakout > score_with_breakdown, \
+            f"Bullish breakout ({score_with_breakout}) should score higher than bearish ({score_with_breakdown})"
+
+    def test_rate_limiting_cooldown(self):
+        """Rate limiter should block rapid successive commands."""
+        from bot import _check_cooldown, _COMMAND_COOLDOWN
+        # First call should pass
+        assert _check_cooldown(999999) is True
+        # Immediate second call should be blocked
+        assert _check_cooldown(999999) is False
+
+    def test_sanitize_error_redacts_token(self):
+        """Error sanitizer should redact bot tokens."""
+        from bot import _sanitize_error
+        token = "123456789:AABBCCDDEEFFgghhiijjkkllmmnnoopp"
+        error = Exception(f"Request failed: https://api.telegram.org/bot{token}/sendMessage")
+        sanitized = _sanitize_error(error, token)
+        assert token not in sanitized
+        assert "[REDACTED]" in sanitized
+
+    def test_validator_vectorized_consistency(self, sample_ohlcv):
+        """Vectorized price consistency check should match old iterrows logic."""
+        from data.validator import validate_ohlcv
+        result = validate_ohlcv(sample_ohlcv, "TEST")
+        # Good data should have 0 inconsistent bars
+        # Check that no consistency warning was raised
+        consistency_issues = [i for i in result.issues if "inconsistent" in i.lower()]
+        assert len(consistency_issues) == 0, f"Good data should have no consistency issues: {consistency_issues}"

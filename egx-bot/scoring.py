@@ -96,14 +96,15 @@ def _score_trend(analysis: StockAnalysis) -> ScoreFactor:
     if sma:
         if sma.signal == 1:
             score += 15
-            reasons.append("الاتجاه صاعد (SSA)")
+            reasons.append("الاتجاه صاعد (SMA)")
         elif sma.signal == -1:
             score -= 15
             reasons.append("الاتجاه هابط (SMA)")
-        if "Golden Cross" in sma.note:
+        # Golden/Death cross detection — check both English text and Arabic
+        if "Golden Cross" in sma.note or "تقاطع ذهبي" in sma.note:
             score += 10
             reasons.append("تقاطع ذهبي")
-        elif "Death Cross" in sma.note:
+        elif "Death Cross" in sma.note or "تقاطع الموت" in sma.note:
             score -= 10
             reasons.append("تقاطع الموت")
 
@@ -261,10 +262,10 @@ def _score_breakout(analysis: StockAnalysis) -> ScoreFactor:
     reasons = []
 
     if breakout:
-        if "bullish" in breakout.note.lower():
+        if breakout.signal == 1:
             score += 25
             reasons.append("اختراق مقاومة")
-        elif "bearish" in breakout.note.lower():
+        elif breakout.signal == -1:
             score -= 25
             reasons.append("كسر دعم")
         else:

@@ -93,14 +93,12 @@ def validate_ohlcv(df: pd.DataFrame, ticker: str) -> ValidationResult:
             result.add_issue(f"{ticker}: {negative} non-positive values in {col}", "error")
 
     # 5. Check price consistency: High >= Low, High >= Open, High >= Close, etc.
-    inconsistent = 0
-    for _, row in df.iterrows():
-        try:
-            o, h, l, c = float(row["Open"]), float(row["High"]), float(row["Low"]), float(row["Close"])
-            if h < l or h < o or h < c or l > o or l > c:
-                inconsistent += 1
-        except (TypeError, ValueError):
-            inconsistent += 1
+    # Vectorized for performance (O(1) instead of O(n) iterrows)
+    o = df["Open"].astype(float)
+    h = df["High"].astype(float)
+    l = df["Low"].astype(float)
+    c = df["Close"].astype(float)
+    inconsistent = int(((h < l) | (h < o) | (h < c) | (l > o) | (l > c)).sum())
 
     if inconsistent > 0:
         pct = (inconsistent / len(df)) * 100
