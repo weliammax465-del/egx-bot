@@ -297,3 +297,87 @@ class TestSimulatedEGXScan:
 
         assert passed_count == 13
         assert failed_count == 7
+
+
+# ─── Missing Volume Data Tests ───────────────────────────────────────────────
+
+class TestMissingVolumeData:
+    """
+    Test that the liquidity gate distinguishes between:
+    - "low liquidity" (have volume data, turnover is genuinely low)
+    - "liquidity data unavailable" (Volume is zeros/NaN — can't assess)
+    """
+
+    def test_all_zero_volume_excluded_as_data_unavailable(self):
+        """Stock with ALL Volume=0 should be 'data unavailable', NOT 'low liquidity'."""
+        df = make_flat_ohlcv(days=25, price=50.0, volume=0)
+        result = liquidity_gate(df, "TEST")
+        assert result.passed is False
+        assert "بيانات سيولة غير متوفرة" in result.reason
+        assert result.exclusion_code == "بيانات سيولة غير متوفرة"
+        # Must NOT say "low liquidity" — that's a different diagnosis
+        assert "سيولة ضعيفة" not in result.reason
+
+    def test_all_nan_volume_excluded_as_data_unavailable(self):
+        """Stock with ALL Volume=NaN should be 'data unavailable'."""
+        df = make_flat_ohlcv(days=25, price=50.0, volume=50_000)
+        df["Volume"] = np.nan
+        result = liquidity_gate(df, "TEST")
+        assert result.passed is False
+        assert "بيانات سيولة غير متوفرة" in result.reason
+        assert result.exclusion_code == "بيانات سيولة غير متوفرة"
+
+    def test_half_zero_volume_still_works(self):
+        """If >=50% of days have valid volume, should compute from valid days."""
+        df = make_flat_ohlcv(days=25, price=50.0, volume=50_000)
+        # Zero out 10 of 25 days (40% zeroed → 60% valid → above 50% threshold)
+        df.iloc[:10, df.columns.get_loc("Volume")] = 0
+        result = liquidity_gate(df, "TEST")
+        # Should pass because valid days have enough turnover
+        assert result.passed is True
+        assert result.details["valid_volume_days"] >= 10
+
+    def test_mostly_zero_volume_excluded_as_data_unavailable(self):
+        """If <50% of days have valid volume, should be 'data unavailable'."""
+        df = make_flat_ohlcv(days=25, price=50.0, volume=50_000)
+        # Zero out 15 of 25 days (60% zeroed → 40% valid → below 50% threshold)
+        df.iloc[-15:, df.columns.get_loc("Volume")] = 0
+        result = liquidity_gate(df, "TEST")
+        assert result.passed is False
+        assert "بيانات سيولة غير متوفرة" in result.reason
+
+    def test_exclusion_codes_are_distinct(self):
+        """Low liquidity and data unavailable must have different exclusion codes."""
+        # Low liquidity
+        df_low = make_flat_ohlcv(days=25, price=5.0, volume=1_000)
+        result_low = liquidity_gate(df_low, "LOW")
+        # Data unavailable
+        df_zero = make_flat_ohlcv(days=25, price=50.0, volume=0)
+        result_zero = liquidity_gate(df_zero, "ZERO")
+
+        assert result_low.exclusion_code != result_zero.exclusion_code
+        assert result_low.exclusion_code == "سيولة ضعيفة"
+        assert result_zero.exclusion_code == "بيانات سيولة غير متوفرة"
+
+    def test_get_exclusion_code_returns_correct_code(self):
+        """get_exclusion_code should return the short code for analytics."""
+        from filters import get_exclusion_code
+        df = make_flat_ohlcv(days=25, price=50.0, volume=0)
+        _, results = pass_all_gates(df, daily_change_pct=3.0, ticker="TEST")
+        code = get_exclusion_code(results)
+        assert code == "بيانات سيولة غير متوفرة"
+
+    def test_get_exclusion_code_empty_when_all_pass(self):
+        """get_exclusion_code should return empty string when all pass."""
+        from filters import get_exclusion_code
+        df = make_ohlcv(days=25, base_price=50.0, base_volume=50_000)
+        _, results = pass_all_gates(df, daily_change_pct=3.0, ticker="TEST")
+        code = get_exclusion_code(results)
+        assert code == ""
+
+    def test_low_liquidity_has_valid_volume_days_in_details(self):
+        """Low liquidity result should report how many valid volume days were used."""
+        df = make_flat_ohlcv(days=25, price=5.0, volume=1_000)
+        result = liquidity_gate(df, "TEST")
+        assert "valid_volume_days" in result.details
+        assert result.details["valid_volume_days"] == 20  # all 20 days valid
