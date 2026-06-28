@@ -25,6 +25,7 @@ Scheduled:
 
 import os
 import sys
+import time
 import logging
 from datetime import datetime
 import pytz
@@ -37,6 +38,7 @@ from fetch_egx import build_market_summary, format_summary_text
 from stock_scanner import (
     scan_all_stocks, format_analysis_for_ai,
     get_buy_signals, get_watchlist, get_single_stock,
+    scan_single_stock,
 )
 from ai_report import (
     explain_analysis, build_telegram_message, build_stocks_table_message,
@@ -63,6 +65,33 @@ def check_env() -> None:
 def _is_egx_trading_day() -> bool:
     """EGX trades Sunday–Thursday. Skip Friday(4) and Saturday(5)."""
     return datetime.now(CAIRO_TZ).weekday() not in (4, 5)
+
+
+def _sanitize_error(e: Exception, token: str = "") -> str:
+    """Remove bot token from error messages to prevent secret exposure in logs."""
+    msg = str(e)
+    if token:
+        msg = msg.replace(token, "[REDACTED]")
+    # Also redact any pattern that looks like a bot token (digits:alphanumeric)
+    import re
+    msg = re.sub(r'\d{8,12}:[A-Za-z0-9_-]{30,}', '[REDACTED]', msg)
+    return msg
+
+
+
+# ─── Rate Limiting ───────────────────────────────────────────────────────────
+
+_last_command_time: dict[int, float] = {}
+_COMMAND_COOLDOWN = 30  # seconds — prevent spam
+
+
+def _check_cooldown(chat_id: int) -> bool:
+    """Returns True if command is allowed, False if on cooldown."""
+    now = time.time()
+    if chat_id in _last_command_time and now - _last_command_time[chat_id] < _COMMAND_COOLDOWN:
+        return False
+    _last_command_time[chat_id] = now
+    return True
 
 
 # ─── Command Handlers ────────────────────────────────────────────────────────
@@ -92,6 +121,9 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def cmd_today(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Full daily report: market overview + AI explanation + scored stocks."""
+    if not _check_cooldown(update.effective_chat.id):
+        await update.message.reply_text("⏳ يرجى الانتظار 30 ثانية بين الأوامر.")
+        return
     msg = await update.message.reply_text(
         "⏳ جاري تحليل جميع أسهم البورصة المصرية…\n"
         "📊 حساب 15+ مؤشر تقني + درجة من 100 لكل سهم"
@@ -121,7 +153,7 @@ async def cmd_today(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             await update.message.reply_text(stocks_msg, parse_mode=ParseMode.MARKDOWN)
 
     except Exception as e:
-        logger.error(f"Error in /today: {e}", exc_info=True)
+        logger.error(f"Error in /today: {_sanitize_error(e)}")
         try:
             await update.message.reply_text("❌ حدث خطأ. يرجى المحاولة لاحقًا.")
         except Exception:
@@ -161,7 +193,7 @@ async def cmd_market(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         await msg.edit_text("\n".join(lines), parse_mode=ParseMode.MARKDOWN)
 
     except Exception as e:
-        logger.error(f"Error in /market: {e}", exc_info=True)
+        logger.error(f"Error in /market: {_sanitize_error(e)}")
         try:
             await msg.edit_text("❌ تعذّر جلب بيانات السوق.")
         except Exception:
@@ -170,6 +202,9 @@ async def cmd_market(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 async def cmd_watchlist(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Top buy and watch opportunities only — no AI summary."""
+    if not _check_cooldown(update.effective_chat.id):
+        await update.message.reply_text("⏳ يرجى الانتظار 30 ثانية بين الأوامر.")
+        return
     msg = await update.message.reply_text("⏳ جاري مسح الأسهم وغير التوصيات…")
 
     try:
@@ -230,7 +265,7 @@ async def cmd_watchlist(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
 
     except Exception as e:
-        logger.error(f"Error in /watchlist: {e}", exc_info=True)
+        logger.error(f"Error in /watchlist: {_sanitize_error(e)}")
         try:
             await update.message.reply_text("❌ حدث خطأ أثناء المسح.")
         except Exception:
@@ -252,13 +287,12 @@ async def cmd_stock(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     msg = await update.message.reply_text(f"⏳ جاري تحليل {ticker}…")
 
     try:
-        stocks = scan_all_stocks()
-        stock = get_single_stock(stocks, ticker)
+        stock = scan_single_stock(ticker)
 
         if not stock:
             await msg.edit_text(
                 f"❌ لم يتم العثور على السهم {_escape_markdown(ticker)}.\n"
-                "تأكد من الرمز. استخدم /help لمعرفة الأوامر."
+                "تأكد من الرمز أو أن البيانات متوفرة."
             )
             return
 
@@ -267,7 +301,7 @@ async def cmd_stock(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text(detail, parse_mode=ParseMode.MARKDOWN)
 
     except Exception as e:
-        logger.error(f"Error in /stock: {e}", exc_info=True)
+        logger.error(f"Error in /stock: {_sanitize_error(e)}")
         try:
             await update.message.reply_text("❌ حدث خطأ أثناء التحليل.")
         except Exception:
@@ -321,8 +355,8 @@ async def send_scheduled_report() -> None:
         logger.info("Scheduled report sent successfully.")
 
     except Exception as e:
-        safe_err = str(e).replace(token, "[REDACTED]")
-        logger.error(f"Failed to send report: {safe_err}", exc_info=True)
+        safe_err = _sanitize_error(e, token)
+        logger.error(f"Failed to send report: {safe_err}")
         try:
             await bot.send_message(chat_id=chat_id, text="❌ تعذّر إرسال التقرير اليوم.")
         except Exception:

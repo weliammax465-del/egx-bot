@@ -27,7 +27,7 @@ from bs4 import BeautifulSoup
 
 from indicators import StockAnalysis, analyze_stock
 from scoring import compute_score, ScoringResult
-from data.symbols import normalize_symbol, is_valid_egx_symbol, get_arabic_name, validate_stock_entry, update_canonical_list
+from data.symbols import normalize_symbol, is_valid_egx_symbol, get_arabic_name, get_canonical_name, validate_stock_entry, update_canonical_list
 from data.validator import validate_ohlcv, validate_price, validate_change_pct, deduplicate_stocks, check_data_freshness
 
 logger = logging.getLogger(__name__)
@@ -170,18 +170,92 @@ def download_stock_history(ticker: str, n_bars: int = 250, retries: int = 2) -> 
     return None
 
 
+# ─── Scan Caching ────────────────────────────────────────────────────────────
+
+_scan_cache: dict = {}
+_CACHE_TTL = 300  # 5 minutes
+
+
+def _get_cached_scan() -> list[StockAnalysis] | None:
+    """Return cached scan results if fresh enough."""
+    if _scan_cache and time.time() - _scan_cache.get("time", 0) < _CACHE_TTL:
+        logger.info("Returning cached scan results.")
+        return _scan_cache.get("data")
+    return None
+
+
+def _set_cached_scan(data: list[StockAnalysis]) -> None:
+    """Cache scan results."""
+    _scan_cache["time"] = time.time()
+    _scan_cache["data"] = data
+
+
+# ─── Single Stock Scan ───────────────────────────────────────────────────────
+
+def scan_single_stock(ticker: str) -> StockAnalysis | None:
+    """
+    Scan a single stock by ticker — much faster than scan_all_stocks().
+    Used by /stock SYMBOL command.
+    """
+    ticker = normalize_symbol(ticker)
+    if not is_valid_egx_symbol(ticker):
+        logger.warning(f"Symbol {ticker} is not a verified EGX symbol.")
+        return None
+
+    name_ar = get_arabic_name(ticker)
+    name_en = get_canonical_name(ticker) or name_ar
+
+    # Check cache first
+    cached = _get_cached_scan()
+    if cached:
+        for s in cached:
+            if s.ticker == ticker:
+                return s
+
+    # Download historical data
+    df = download_stock_history(ticker, n_bars=250, retries=2)
+    if df is None or len(df) < 50:
+        logger.warning(f"No data for {ticker}.")
+        return None
+
+    # Validate
+    validation = validate_ohlcv(df, ticker)
+    if not validation.is_valid:
+        logger.warning(f"Data validation failed for {ticker}: {validation.issues[:2]}")
+        return None
+
+    # Analyze
+    try:
+        analysis = analyze_stock(df, ticker, name_en, name_ar)
+        analysis.data_freshness = validation.freshness
+        analysis.data_quality = validation.quality_score
+        analysis.timestamp = datetime.now().isoformat()
+        analysis.scoring_result = compute_score(analysis, validation.freshness, validation.quality_score)
+        return analysis
+    except Exception as e:
+        logger.error(f"Analysis failed for {ticker}: {e}")
+        return None
+
+
+
 # ─── Full Scan ───────────────────────────────────────────────────────────────
 
 def scan_all_stocks() -> list[StockAnalysis]:
     """
     Full pipeline:
-    1. Collect stock list (scrape + validate)
-    2. Download historical data per stock (with retries)
-    3. Validate OHLCV data
-    4. Compute technical indicators
-    5. Score each stock (0-100 deterministic)
-    6. Return sorted by composite score
+    1. Check cache (return if fresh)
+    2. Collect stock list (scrape + validate)
+    3. Download historical data per stock (with retries)
+    4. Validate OHLCV data
+    5. Compute technical indicators
+    6. Score each stock (0-100 deterministic)
+    7. Cache and return sorted by composite score
     """
+    # Check cache first
+    cached = _get_cached_scan()
+    if cached is not None:
+        return cached
+
     stock_list = scrape_egx_stock_list()
     if not stock_list:
         logger.error("No stocks available. All sources failed.")
@@ -278,6 +352,7 @@ def scan_all_stocks() -> list[StockAnalysis]:
         time.sleep(0.15)
 
     results.sort(key=lambda x: x.composite_score, reverse=True)
+    _set_cached_scan(results)
     logger.info(f"Scan complete: {success_count} analyzed, {fail_count} failed, {rejected_count} rejected, {total} total")
     return results
 
@@ -299,14 +374,14 @@ def get_top_bearish(stocks: list[StockAnalysis], top_n: int = 5) -> list[StockAn
 
 def get_buy_signals(stocks: list[StockAnalysis]) -> list[StockAnalysis]:
     """Stocks with Buy recommendation from the scoring engine."""
-    return [s for s in stocks if hasattr(s, 'scoring_result') and s.scoring_result.recommendation == "Buy"]
+    return [s for s in stocks if s.scoring_result is not None and s.scoring_result.recommendation == "Buy"]
 
 
 def get_watchlist(stocks: list[StockAnalysis]) -> list[StockAnalysis]:
     """Stocks with Watch or Buy recommendation."""
     result = []
     for s in stocks:
-        if hasattr(s, 'scoring_result'):
+        if s.scoring_result is not None:
             if s.scoring_result.recommendation in ("Buy", "Watch"):
                 result.append(s)
     return result
@@ -336,9 +411,9 @@ def format_analysis_for_ai(stocks: list[StockAnalysis], market_text: str = "") -
     total_with_data = len(analyzed)
     total_all = len(stocks)
 
-    buy_count = sum(1 for s in analyzed if hasattr(s, 'scoring_result') and s.scoring_result.recommendation == "Buy")
-    watch_count = sum(1 for s in analyzed if hasattr(s, 'scoring_result') and s.scoring_result.recommendation == "Watch")
-    sell_count = sum(1 for s in analyzed if hasattr(s, 'scoring_result') and s.scoring_result.recommendation == "Sell")
+    buy_count = sum(1 for s in analyzed if s.scoring_result is not None and s.scoring_result.recommendation == "Buy")
+    watch_count = sum(1 for s in analyzed if s.scoring_result is not None and s.scoring_result.recommendation == "Watch")
+    sell_count = sum(1 for s in analyzed if s.scoring_result is not None and s.scoring_result.recommendation == "Sell")
 
     lines.append(f"Total stocks scanned: {total_all}")
     lines.append(f"Stocks with full analysis: {total_with_data}")
@@ -346,7 +421,7 @@ def format_analysis_for_ai(stocks: list[StockAnalysis], market_text: str = "") -
     lines.append("")
 
     # Top stocks with full computed data
-    top = [s for s in analyzed if hasattr(s, 'scoring_result')]
+    top = [s for s in analyzed if s.scoring_result is not None]
     top.sort(key=lambda x: x.scoring_result.total_score, reverse=True)
     top = top[:20]
 
@@ -371,7 +446,7 @@ def format_analysis_for_ai(stocks: list[StockAnalysis], market_text: str = "") -
         lines.append("")
 
     # Bottom-ranked (bearish)
-    bottom = [s for s in analyzed if hasattr(s, 'scoring_result')]
+    bottom = [s for s in analyzed if s.scoring_result is not None]
     bottom.sort(key=lambda x: x.scoring_result.total_score)
     bottom = bottom[:10]
 

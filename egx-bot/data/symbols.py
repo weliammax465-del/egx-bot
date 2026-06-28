@@ -116,11 +116,8 @@ def is_valid_egx_symbol(symbol: str) -> bool:
     normalized = normalize_symbol(symbol)
     if not normalized:
         return False
-    # Check against canonical list
+    # Only accept symbols in the canonical EGX list
     if normalized in _canonical_symbols:
-        return True
-    # Also accept symbols we have Arabic names for (broader coverage)
-    if normalized in ARABIC_NAMES:
         return True
     logger.debug(f"Symbol {normalized} not found in canonical EGX list.")
     return False
@@ -147,14 +144,14 @@ def get_canonical_name(symbol: str) -> str:
 def update_canonical_list(stocks: list[dict]) -> None:
     """
     Update the canonical symbol set with freshly scraped data.
-    This allows the system to learn new symbols while still validating against known ones.
+    Only adds symbols that already exist in the canonical list — does NOT accept
+    unknown symbols from external sources (security: prevents injection of fake symbols).
     """
     global _canonical_symbols, _canonical_names
     _load_canonical_list()
     for s in stocks:
         sym = normalize_symbol(s.get("symbol", ""))
-        if sym:
-            _canonical_symbols.add(sym)
+        if sym and sym in _canonical_symbols:  # Only update names for known symbols
             if "name" in s and s["name"]:
                 _canonical_names[sym] = s["name"]
 

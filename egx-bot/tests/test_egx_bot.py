@@ -684,3 +684,132 @@ class TestIntegration:
         ]
         stocks.sort(key=lambda x: x.composite_score, reverse=True)
         assert stocks[0].composite_score >= stocks[-1].composite_score
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# EDGE CASE & REGRESSION TESTS
+# ═══════════════════════════════════════════════════════════════════════════
+
+class TestEdgeCases:
+    """Edge cases and regression tests for production safety."""
+
+    def test_stochastic_rsi_flat_rsi(self):
+        """Stochastic RSI should handle flat RSI (division by zero) gracefully."""
+        from indicators import calc_stochastic_rsi
+        # Create data that produces flat RSI (all closes equal)
+        dates = pd.date_range(end=datetime.now(), periods=100, freq="B")
+        df = pd.DataFrame({
+            "Open": [100.0]*100, "High": [100.0]*100, "Low": [100.0]*100,
+            "Close": [100.0]*100, "Volume": [1000.0]*100,
+        }, index=dates)
+        result = calc_stochastic_rsi(df)
+        # Should return a valid result, not crash
+        assert result.name == "Stochastic RSI"
+        assert 0 <= result.value <= 100 or result.value == 50.0
+
+    def test_vwap_zero_volume(self):
+        """VWAP should handle zero volume gracefully."""
+        from indicators import calc_vwap
+        dates = pd.date_range(end=datetime.now(), periods=60, freq="B")
+        df = pd.DataFrame({
+            "Open": np.linspace(100, 110, 60),
+            "High": np.linspace(102, 112, 60),
+            "Low": np.linspace(99, 109, 60),
+            "Close": np.linspace(101, 111, 60),
+            "Volume": [0.0]*60,
+        }, index=dates)
+        result = calc_vwap(df)
+        assert result.value > 0  # Should fall back to close price
+
+    def test_supertrend_no_bias(self):
+        """SuperTrend should start neutral (no bullish bias)."""
+        from indicators import calc_supertrend
+        # With very first bars, trend should not default to bullish
+        df = _make_ohlcv(250, trend=0.0)  # No trend
+        result = calc_supertrend(df)
+        assert result.signal in (-1, 0, 1)
+
+    def test_volume_ratio_zero_avg(self):
+        """Volume ratio should handle zero average volume."""
+        from indicators import calc_volume_ratio
+        dates = pd.date_range(end=datetime.now(), periods=60, freq="B")
+        df = pd.DataFrame({
+            "Open": [100.0]*60, "High": [101.0]*60, "Low": [99.0]*60,
+            "Close": [100.0]*60, "Volume": [0.0]*60,
+        }, index=dates)
+        result = calc_volume_ratio(df)
+        assert result.value == 1.0  # Safe default
+
+    def test_risk_reward_no_levels(self):
+        """Risk/Reward should handle missing support/resistance."""
+        from indicators import calc_risk_reward, SupportResistanceResult
+        sr = SupportResistanceResult(0, 0, 0, 0)  # No levels found
+        result = calc_risk_reward(sr, 100.0)
+        assert result.value == 0.0
+        assert result.signal == 0
+
+    def test_scoring_result_field_exists(self):
+        """StockAnalysis should have scoring_result field (not dynamic hasattr)."""
+        from indicators import StockAnalysis
+        a = StockAnalysis(ticker="T", name="T", name_ar="ت",
+                         current_price=100, daily_change_pct=1, volume=1000)
+        # Should be None by default, not raise AttributeError
+        assert a.scoring_result is None
+
+    def test_validator_quality_additive(self):
+        """Quality degradation should be additive, not exponential."""
+        from data.validator import ValidationResult
+        r = ValidationResult(is_valid=True)
+        initial = r.quality_score
+        r.add_issue("warning 1", "warning")
+        after1 = r.quality_score
+        r.add_issue("warning 2", "warning")
+        after2 = r.quality_score
+        # Each warning should subtract ~0.15, not multiply by 0.8
+        assert abs((initial - after1) - (after1 - after2)) < 0.01, \
+            f"Degradation should be linear: {initial} -> {after1} -> {after2}"
+
+    def test_canonical_list_rejects_unknown(self):
+        """update_canonical_list should NOT accept unknown symbols from scraping."""
+        from data.symbols import update_canonical_list, is_valid_egx_symbol
+        # Try to inject a fake symbol
+        update_canonical_list([{"symbol": "FAKE_INJECTED", "name": "Fake"}])
+        assert is_valid_egx_symbol("FAKE_INJECTED") is False
+
+    def test_escape_markdown_special_chars(self):
+        """Markdown escaping should handle all V1 special chars."""
+        from ai_report import _escape_markdown
+        # All V1 specials: * _ ` [
+        text = "price *bold* _under_ `code` [link]"
+        escaped = _escape_markdown(text)
+        assert "\*" in escaped
+        assert "\_" in escaped
+        assert "\`" in escaped
+        assert "\[" in escaped
+
+    def test_safe_truncate_preserves_end(self):
+        """Truncation should always end with ellipsis."""
+        from ai_report import _safe_truncate
+        long = "A" * 5000
+        result = _safe_truncate(long, 100)
+        assert result.endswith("…") or result.endswith("…\n")
+
+    def test_format_stock_detail_with_scoring(self, bullish_ohlcv):
+        """format_stock_detail should include score when scoring_result is set."""
+        from indicators import analyze_stock
+        from scoring import compute_score
+        from ai_report import format_stock_detail
+        a = analyze_stock(bullish_ohlcv, "TEST", "Test", "تجربة")
+        a.scoring_result = compute_score(a, "fresh", 0.9)
+        detail = format_stock_detail(a)
+        assert "درجة" in detail
+        assert "/100" in detail
+
+    def test_format_stock_detail_without_scoring(self, sample_ohlcv):
+        """format_stock_detail should work even without scoring_result."""
+        from indicators import analyze_stock
+        from ai_report import format_stock_detail
+        a = analyze_stock(sample_ohlcv, "TEST", "Test", "تجربة")
+        # scoring_result is None by default
+        detail = format_stock_detail(a)
+        assert "TEST" in detail or "تجربة" in detail

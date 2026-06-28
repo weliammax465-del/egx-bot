@@ -182,7 +182,7 @@ def build_telegram_message(
         lines.append("")
 
     # Score-based summary
-    analyzed = [s for s in stocks if hasattr(s, 'scoring_result') and s.data_quality >= 0.5]
+    analyzed = [s for s in stocks if s.scoring_result is not None and s.data_quality >= 0.5]
     buy_count = sum(1 for s in analyzed if s.scoring_result.recommendation == "Buy")
     watch_count = sum(1 for s in analyzed if s.scoring_result.recommendation == "Watch")
     sell_count = sum(1 for s in analyzed if s.scoring_result.recommendation == "Sell")
@@ -207,7 +207,7 @@ def build_stocks_table_message(stocks: list[StockAnalysis]) -> str:
     lines = ["📊 *تفاصيل الأسهم — درجات وتوصيات*", ""]
 
     # Get scored stocks sorted by score
-    scored = [s for s in stocks if hasattr(s, 'scoring_result') and s.data_quality >= 0.5]
+    scored = [s for s in stocks if s.scoring_result is not None and s.data_quality >= 0.5]
     scored.sort(key=lambda x: x.scoring_result.total_score, reverse=True)
 
     top_buy = [s for s in scored if s.scoring_result.recommendation == "Buy"][:10]
@@ -268,9 +268,6 @@ def build_stocks_table_message(stocks: list[StockAnalysis]) -> str:
 
 def format_stock_detail(stock: StockAnalysis) -> str:
     """Format a single stock's full analysis for /stock command."""
-    from stock_scanner import get_arabic_name
-    from data.symbols import get_arabic_name as _gan
-
     lines = [
         f"📊 *{_escape_markdown(stock.name_ar)}* ({_escape_markdown(stock.ticker)})",
         "",
@@ -280,7 +277,7 @@ def format_stock_detail(stock: StockAnalysis) -> str:
         "",
     ]
 
-    if hasattr(stock, 'scoring_result'):
+    if stock.scoring_result is not None:
         sr = stock.scoring_result
         lines += [
             f"🎯 الدرجة: *{sr.total_score}/100*",

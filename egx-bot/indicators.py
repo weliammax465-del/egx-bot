@@ -31,7 +31,10 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from scoring import ScoringResult
 
 import pandas as pd
 import numpy as np
@@ -103,6 +106,7 @@ class StockAnalysis:
     vwap: float = 0.0
     supertrend_signal: str = "unknown"
     breakout_type: str = "none"
+    scoring_result: Optional["ScoringResult"] = None
 
     @property
     def is_bullish(self) -> bool:
@@ -188,7 +192,9 @@ def calc_stochastic_rsi(df: pd.DataFrame, period: int = 14) -> IndicatorResult:
     # Stochastic of RSI
     min_rsi = rsi_series.rolling(window=period).min()
     max_rsi = rsi_series.rolling(window=period).max()
-    stoch_rsi = (rsi_series - min_rsi) / (max_rsi - min_rsi) * 100
+    rsi_range = max_rsi - min_rsi
+    rsi_range = rsi_range.replace(0, np.nan)  # Avoid division by zero
+    stoch_rsi = (rsi_series - min_rsi) / rsi_range * 100
     stoch_rsi = stoch_rsi.dropna()
 
     if len(stoch_rsi) == 0:
@@ -391,7 +397,10 @@ def calc_vwap(df: pd.DataFrame, window: int = 20) -> IndicatorResult:
     """VWAP — Volume Weighted Average Price over rolling window."""
     recent = df.tail(window)
     typical_price = (recent["High"] + recent["Low"] + recent["Close"]) / 3
-    vwap = (typical_price * recent["Volume"]).sum() / recent["Volume"].sum()
+    total_vol = recent["Volume"].sum()
+    if total_vol <= 0:
+        return IndicatorResult("VWAP", "متوسط السعر المرجح بالحجم", float(df["Close"].iloc[-1]), 0, "محايد", "لا يتوفر حجم")
+    vwap = (typical_price * recent["Volume"]).sum() / total_vol
     price = df["Close"].iloc[-1]
 
     if price > vwap:
@@ -419,26 +428,26 @@ def calc_supertrend(df: pd.DataFrame, period: int = 10, multiplier: float = 3.0)
     trend = pd.Series(index=df.index, dtype=float)
 
     for i in range(1, len(df)):
-        if pd.isna(atr.iloc[i]):
+        if pd.isna(atr.iloc[i]) or pd.isna(upper_band.iloc[i]):
             continue
-        # Final upper band
-        if upper_band.iloc[i] == upper_band.iloc[i-1] or pd.isna(final_upper.iloc[i-1]):
-            pass
+        # Final upper band — carry forward if previous was set
+        if pd.isna(final_upper.iloc[i-1]):
+            final_upper.iloc[i] = upper_band.iloc[i]
         elif df["Close"].iloc[i-1] <= final_upper.iloc[i-1]:
             final_upper.iloc[i] = min(upper_band.iloc[i], final_upper.iloc[i-1])
         else:
             final_upper.iloc[i] = upper_band.iloc[i]
 
         # Final lower band
-        if lower_band.iloc[i] == lower_band.iloc[i-1] or pd.isna(final_lower.iloc[i-1]):
-            pass
+        if pd.isna(final_lower.iloc[i-1]):
+            final_lower.iloc[i] = lower_band.iloc[i]
         elif df["Close"].iloc[i-1] >= final_lower.iloc[i-1]:
             final_lower.iloc[i] = max(lower_band.iloc[i], final_lower.iloc[i-1])
         else:
             final_lower.iloc[i] = lower_band.iloc[i]
 
     # Determine trend
-    prev_trend = 1  # Start bullish
+    prev_trend = 0  # Start neutral — no directional bias
     for i in range(len(df)):
         if pd.isna(final_upper.iloc[i]) or pd.isna(final_lower.iloc[i]):
             continue
@@ -678,6 +687,14 @@ def calc_atr(df: pd.DataFrame, period: int = 14) -> IndicatorResult:
     return IndicatorResult("ATR", "متوسط المدى الحقيقي", round(float(atr_pct), 2), 0, "معلومة", note)
 
 
+def _get_ind(analysis: 'StockAnalysis', name: str) -> IndicatorResult | None:
+    """Find an indicator by name in the analysis."""
+    for ind in analysis.indicators:
+        if ind.name == name:
+            return ind
+    return None
+
+
 # ─── Composite Analysis ───────────────────────────────────────────────────────
 
 def analyze_stock(
@@ -837,10 +854,3 @@ def analyze_stock(
 
     return analysis
 
-
-def _get_ind(analysis: StockAnalysis, name: str) -> IndicatorResult | None:
-    """Find an indicator by name in the analysis."""
-    for ind in analysis.indicators:
-        if ind.name == name:
-            return ind
-    return None

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import pandas as pd
@@ -43,7 +43,7 @@ class ValidationResult:
             self.is_valid = False
             self.quality_score = min(self.quality_score, 0.0)
         elif severity == "warning":
-            self.quality_score = min(self.quality_score, self.quality_score * 0.8)
+            self.quality_score = max(0.0, self.quality_score - 0.15)
 
 
 def validate_ohlcv(df: pd.DataFrame, ticker: str) -> ValidationResult:
@@ -79,7 +79,10 @@ def validate_ohlcv(df: pd.DataFrame, ticker: str) -> ValidationResult:
         if nan_count > 0:
             result.add_issue(f"{ticker}: {nan_count} NaN values in {col}", "warning")
 
-        inf_count = np.isinf(df[col].astype(float)).sum()
+        try:
+            inf_count = int(np.isinf(df[col].astype(float)).sum())
+        except (TypeError, ValueError):
+            inf_count = 0
         if inf_count > 0:
             result.add_issue(f"{ticker}: {inf_count} inf values in {col}", "error")
 
@@ -163,7 +166,10 @@ def check_data_freshness(df: pd.DataFrame) -> str:
     if isinstance(last_date, pd.Timestamp):
         last_date = last_date.to_pydatetime()
 
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
+    # Handle both tz-aware and naive datetimes
+    if last_date.tzinfo is None:
+        last_date = last_date.replace(tzinfo=timezone.utc)
     age_hours = (now - last_date).total_seconds() / 3600
 
     if age_hours < 24:
