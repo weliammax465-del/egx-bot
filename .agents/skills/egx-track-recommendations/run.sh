@@ -1,39 +1,36 @@
 #!/bin/bash
-# EGX Track Recommendations — processes daily recommendations JSON from GitHub
-# and saves to RecommendationHistory entity for performance tracking.
+# EGX Track Recommendations — monitoring + JSON processing
 #
-# Usage: run.sh [json_date_YYYY-MM-DD]
-# If no date given, uses today's date (Cairo timezone).
+# This skill is triggered by a Base44 automation at 9:15 AM Cairo time.
+# It runs monitor.py which:
+#   1. Checks if today's GitHub Actions workflow succeeded
+#   2. If succeeded: clones repo, reads recommendations JSON, outputs it
+#   3. If failed: sends Telegram alert + triggers workflow_dispatch retry
+#   4. Waits 20 min, checks retry — sends final alert if still failed
+#
+# Usage: run.sh [json_date_YYYY-MM-DD]  (date is optional, for backward compat)
+#
+# Environment variables (must be set in sandbox):
+#   GITHUB_TOKEN       — GitHub PAT
+#   TELEGRAM_BOT_TOKEN — Telegram bot token
+#   TELEGRAM_CHAT_ID   — Telegram chat ID (default: 7534010234)
 
 set -euo pipefail
 
-REPO_URL="https://github.com/weliammax465-del/egx-bot.git"
-CLONE_DIR="/tmp/egx-bot-track"
-TODAY=$(TZ="Africa/Cairo" date +%Y-%m-%d)
-TARGET_DATE="${1:-$TODAY}"
+SCRIPT_DIR="/app/egx-bot"
 
-echo "=== EGX Track Recommendations ==="
-echo "Target date: $TARGET_DATE"
+echo "=== EGX Track & Monitor — $(TZ='Africa/Cairo' date '+%Y-%m-%d %H:%M') Cairo ==="
 
-# Clone or pull the repo
-if [ -d "$CLONE_DIR" ]; then
-  echo "Pulling latest changes..."
-  cd "$CLONE_DIR"
-  git pull --quiet
+# Run the monitoring script
+# It handles everything: GitHub check, Telegram alerts, retry, JSON processing
+python3 "${SCRIPT_DIR}/monitor.py" 2>&1
+
+# Exit code from monitor.py
+EXIT_CODE=$?
+if [ $EXIT_CODE -eq 0 ]; then
+    echo "✅ Monitoring completed successfully"
 else
-  echo "Cloning repo..."
-  git clone --depth 1 "$REPO_URL" "$CLONE_DIR" --quiet
-  cd "$CLONE_DIR"
+    echo "⚠️ Monitoring completed with exit code $EXIT_CODE"
 fi
 
-# Find the recommendations JSON file
-JSON_FILE="data/recommendations_${TARGET_DATE}.json"
-if [ ! -f "$JSON_FILE" ]; then
-  echo "ERROR: No recommendations file found for $TARGET_DATE"
-  echo "Looking for recent files..."
-  ls -t data/recommendations_*.json 2>/dev/null | head -3
-  exit 1
-fi
-
-echo "Found: $JSON_FILE"
-cat "$JSON_FILE"
+exit 0

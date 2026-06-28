@@ -1,26 +1,41 @@
 # EGX Track Recommendations
 
-This skill processes the daily recommendations JSON file from the EGX Bot GitHub repository
-and saves it to the RecommendationHistory entity for performance tracking.
+This skill monitors the EGX Bot's daily GitHub Actions run and processes recommendations data.
 
 ## What it does
 
-1. Clones (or pulls) the EGX Bot GitHub repo
-2. Finds the latest `data/recommendations_YYYY-MM-DD.json` file
-3. Saves new recommendations to the `RecommendationHistory` entity (via `create_entity_records`)
-4. Evaluates past recommendations that are due for 7-day or 30-day check (using `current_prices` from the JSON)
-5. Updates evaluated records with PnL, result, and status
+1. **Checks GitHub Actions workflow status** for today (did the daily report run succeed?)
+2. **If succeeded**: Clones the repo, reads `data/recommendations_YYYY-MM-DD.json`, and outputs it for entity tracking
+3. **If failed or no run**: Sends an immediate Telegram alert to the user, then triggers `workflow_dispatch` to retry
+4. **Waits 20 minutes**, checks the retry result:
+   - If retry succeeded: sends a "✅ retry successful" Telegram message and processes the JSON
+   - If retry also failed: sends a "❌ manual intervention needed" Telegram alert with details
 
-## When to run
+## When it runs
 
-This skill is called by a scheduled automation at 9:30 AM Cairo time (30 minutes after the bot's daily run).
+Scheduled automation at **9:15 AM Cairo time** (7:15 AM UTC) — 15 minutes after the GitHub Actions cron (9:00 AM Cairo).
 
-## Inputs
+## Environment variables required
 
-- `json_date` (optional): Specific date to process (YYYY-MM-DD). If omitted, uses today's date.
+- `GITHUB_TOKEN` — GitHub PAT with `repo` and `actions` scope
+- `TELEGRAM_BOT_TOKEN` — Telegram bot token for sending alerts
+- `TELEGRAM_CHAT_ID` — User's Telegram chat ID (default: 7534010234)
 
-## Evaluation criteria
+## Telegram alerts sent
 
-- Buy: pnl = (current - recommended) / recommended * 100
-- Sell: pnl = (recommended - current) / recommended * 100
-- pnl > 3% = win, pnl < -3% = loss, between = neutral
+| Scenario | Alert message |
+|----------|---------------|
+| Workflow failed/missing | ⚠️ تنبيه EGX Bot — [date] — تقرير اليوم فشل... جاري إعادة التشغيل |
+| Retry triggered but failed | ❌ تنبيه عاجل EGX Bot — محتاج تدخل يدوي |
+| Retry succeeded | ✅ EGX Bot — تمت إعادة التشغيل بنجاح |
+| Cannot trigger retry | ❌ تنبيه عاجل — فشل تشغيل إعادة المحاولة |
+
+## JSON processing
+
+When the workflow succeeds, the script outputs the recommendations JSON between markers:
+```
+=== JSON_DATA_START ===
+{...json data...}
+=== JSON_DATA_END ===
+```
+The agent reads this output and saves recommendations to the `RecommendationHistory` entity, then evaluates past recommendations due for 7-day or 30-day checks.

@@ -37,7 +37,7 @@ jobs:
         id: check-sent
         uses: actions/cache@v4.2.0
         with:
-          path: .egx_sent_today
+          path: egx-bot/.egx_sent_today
           key: egx-report-${{ steps.date.outputs.today }}
         continue-on-error: true
 
@@ -52,13 +52,13 @@ jobs:
         uses: actions/cache@v4.2.0
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('egx-bot/requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
 
       - name: Install dependencies
         if: steps.check-sent.outputs.cache-hit != 'true'
-        run: pip install -r requirements.txt
+        run: pip install -r egx-bot/requirements.txt
 
       # ── Send Report with Automatic Retry ──────────────────────────
       # 3 attempts with 60s wait between each.
@@ -75,7 +75,7 @@ jobs:
           for attempt in 1 2 3; do
             echo ""
             echo "─── Workflow attempt $attempt of 3 ───"
-            python bot.py --scheduled && {
+            python egx-bot/bot.py --scheduled && {
               echo "✅ Report sent successfully on attempt $attempt"
               exit 0
             }
@@ -99,8 +99,8 @@ jobs:
           git config user.name "EGX Bot"
           git config user.email "bot@egx-bot.local"
           # Check if there are any changes (recommendations JSON file)
-          if [ -n "$(git status --porcelain data/recommendations_*.json)" ]; then
-            git add data/recommendations_*.json
+          if [ -n "$(git status --porcelain egx-bot/data/recommendations_*.json)" ]; then
+            git add egx-bot/data/recommendations_*.json
             git commit -m "📊 Recommendations for ${{ steps.date.outputs.today }}"
             git push
             echo "✅ Recommendations JSON committed"
