@@ -21,6 +21,7 @@ Run locally:
 
 Scheduled:
   python bot.py --scheduled
+  python bot.py --scheduled --force  (bypass duplicate prevention)
 """
 
 import os
@@ -54,6 +55,7 @@ logger = logging.getLogger(__name__)
 
 REQUIRED_ENV = ["TELEGRAM_BOT_TOKEN", "GEMINI_API_KEY"]
 CAIRO_TZ = pytz.timezone("Africa/Cairo")
+SENT_FLAG_FILE = os.path.join(os.environ.get("GITHUB_WORKSPACE", os.path.dirname(__file__)), ".egx_sent_today")
 
 
 def check_env() -> None:
@@ -77,6 +79,33 @@ def _sanitize_error(e: Exception, token: str = "") -> str:
     msg = re.sub(r'\d{8,12}:[A-Za-z0-9_-]{30,}', '[REDACTED]', msg)
     return msg
 
+
+
+# ─── Duplicate Prevention ────────────────────────────────────────────────────
+
+def _already_sent_today() -> bool:
+    """Check if today's report was already sent — prevents duplicate messages."""
+    try:
+        with open(SENT_FLAG_FILE, "r") as f:
+            last_date = f.read().strip()
+            today = datetime.now(CAIRO_TZ).strftime("%Y-%m-%d")
+            if last_date == today:
+                logger.info(f"Report already sent today ({today}). Skipping.")
+                return True
+    except (FileNotFoundError, IOError):
+        pass
+    return False
+
+
+def _mark_sent_today() -> None:
+    """Mark today's report as sent."""
+    today = datetime.now(CAIRO_TZ).strftime("%Y-%m-%d")
+    try:
+        with open(SENT_FLAG_FILE, "w") as f:
+            f.write(today)
+        logger.info(f"Marked report as sent for {today}.")
+    except IOError as e:
+        logger.warning(f"Could not write sent flag: {e}")
 
 
 # ─── Rate Limiting ───────────────────────────────────────────────────────────
@@ -313,8 +342,13 @@ async def cmd_stock(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 # ─── Scheduled Push ──────────────────────────────────────────────────────────
 
-async def send_scheduled_report() -> None:
-    """Push daily report to TELEGRAM_CHAT_ID (called by GitHub Actions)."""
+async def send_scheduled_report(force: bool = False) -> bool:
+    """
+    Push daily report to TELEGRAM_CHAT_ID (called by GitHub Actions).
+    Includes duplicate prevention and automatic retry logic.
+    Returns True if sent, False if skipped.
+    Exits with code 1 on failure (triggers workflow retry).
+    """
     token = os.environ["TELEGRAM_BOT_TOKEN"]
     chat_id = os.environ.get("TELEGRAM_CHAT_ID")
 
@@ -322,49 +356,81 @@ async def send_scheduled_report() -> None:
         logger.error("TELEGRAM_CHAT_ID is not set.")
         sys.exit(1)
 
-    bot = Bot(token=token)
-
+    # Skip non-trading days (Friday/Saturday in Cairo)
     if not _is_egx_trading_day():
-        logger.info("Not an EGX trading day. Skipping.")
-        return
+        logger.info("Not an EGX trading day (Friday/Saturday). Skipping.")
+        return False
 
-    try:
-        await bot.send_message(
-            chat_id=chat_id,
-            text="⏳ جاري تحضير التقرير اليومي…\n📊 تحليل 224+ سهم | 15+ مؤشر تقني | درجة من 100",
-        )
+    # Duplicate prevention — skip if already sent today
+    if not force and _already_sent_today():
+        return False
 
-        market_summary = build_market_summary()
-        stocks = scan_all_stocks()
+    bot = Bot(token=token)
+    max_retries = 3
 
-        if not stocks:
+    for attempt in range(1, max_retries + 1):
+        try:
+            logger.info(f"─── Sending scheduled report (attempt {attempt}/{max_retries}) ───")
+
             await bot.send_message(
                 chat_id=chat_id,
-                text="⚪ لا تتوفر بيانات موثقة اليوم. قد تكون البورصة مغلقة.",
+                text="⏳ جاري تحضير التقرير اليومي…\n📊 تحليل 224+ سهم | 15+ مؤشر تقني | درجة من 100",
             )
-            return
 
-        market_text = format_summary_text(market_summary) if market_summary else ""
-        computed_data = format_analysis_for_ai(stocks, market_text)
-        ai_summary = explain_analysis(computed_data)
+            # 1. Fetch market data
+            logger.info("Step 1/5: Fetching EGX market data...")
+            market_summary = build_market_summary()
 
-        main_msg = build_telegram_message(ai_summary, stocks, market_summary)
-        await bot.send_message(chat_id=chat_id, text=main_msg, parse_mode=ParseMode.MARKDOWN)
+            # 2. Scan all stocks (validate + download + analyze + score)
+            logger.info("Step 2/5: Scanning all EGX stocks...")
+            stocks = scan_all_stocks()
 
-        stocks_msg = build_stocks_table_message(stocks)
-        if len(stocks_msg) > 50:
-            await bot.send_message(chat_id=chat_id, text=stocks_msg, parse_mode=ParseMode.MARKDOWN)
+            if not stocks:
+                await bot.send_message(
+                    chat_id=chat_id,
+                    text="⚪ لا تتوفر بيانات موثقة اليوم. قد تكون البورصة مغلقة.",
+                )
+                logger.warning("No stocks data available. Sent notification to user.")
+                return False
 
-        logger.info("Scheduled report sent successfully.")
+            # 3. Generate AI explanation
+            logger.info("Step 3/5: Generating AI analysis...")
+            market_text = format_summary_text(market_summary) if market_summary else ""
+            computed_data = format_analysis_for_ai(stocks, market_text)
+            ai_summary = explain_analysis(computed_data)
 
-    except Exception as e:
-        safe_err = _sanitize_error(e, token)
-        logger.error(f"Failed to send report: {safe_err}")
-        try:
-            await bot.send_message(chat_id=chat_id, text="❌ تعذّر إرسال التقرير اليوم.")
-        except Exception:
-            pass
-        sys.exit(1)
+            # 4. Build Telegram messages
+            logger.info("Step 4/5: Building report messages...")
+            main_msg = build_telegram_message(ai_summary, stocks, market_summary)
+            stocks_msg = build_stocks_table_message(stocks)
+
+            # 5. Send to Telegram
+            logger.info("Step 5/5: Sending to Telegram...")
+            await bot.send_message(chat_id=chat_id, text=main_msg, parse_mode=ParseMode.MARKDOWN)
+            if len(stocks_msg) > 50:
+                await bot.send_message(chat_id=chat_id, text=stocks_msg, parse_mode=ParseMode.MARKDOWN)
+
+            # Mark as sent — prevents duplicates on retry
+            _mark_sent_today()
+            logger.info("✅ Scheduled report sent successfully.")
+            return True
+
+        except Exception as e:
+            safe_err = _sanitize_error(e, token)
+            logger.error(f"❌ Attempt {attempt}/{max_retries} failed: {safe_err}")
+            if attempt < max_retries:
+                wait = 30 * attempt
+                logger.info(f"⏳ Retrying in {wait} seconds...")
+                time.sleep(wait)
+            else:
+                logger.error("❌ All retry attempts exhausted.")
+                try:
+                    await bot.send_message(chat_id=chat_id, text="❌ تعذّر إرسال التقرير اليوم بعد عدة محاولات.")
+                except Exception:
+                    pass
+                sys.exit(1)
+
+    return False
 
 
 # ─── Entry Point ─────────────────────────────────────────────────────────────
@@ -374,7 +440,8 @@ def main() -> None:
 
     if "--scheduled" in sys.argv:
         import asyncio
-        asyncio.run(send_scheduled_report())
+        force = "--force" in sys.argv
+        asyncio.run(send_scheduled_report(force=force))
         return
 
     token = os.environ["TELEGRAM_BOT_TOKEN"]

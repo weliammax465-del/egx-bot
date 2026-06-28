@@ -2,7 +2,9 @@ name: EGX Daily Technical Analysis Report
 
 on:
   schedule:
-    - cron: "0 7 * * 0-4"
+    # 7:00 AM UTC = 9:00 AM Cairo (Africa/Cairo, UTC+2)
+    # Runs every day — bot code skips non-trading days (Fri/Sat)
+    - cron: "0 7 * * *"
   workflow_dispatch:
   workflow_call:
 
@@ -10,12 +12,13 @@ permissions:
   contents: read
 
 concurrency:
+  # Prevent duplicate runs — if a new run starts, the old one continues
   group: egx-daily-report
   cancel-in-progress: false
 
 jobs:
   send-report:
-    name: Scan All EGX Stocks & Send Technical Analysis
+    name: EGX Daily Report — Scan & Send to Telegram
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -23,12 +26,29 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4.2.2
 
+      - name: Get today's date (UTC)
+        id: date
+        run: echo "today=$(date -u +%Y-%m-%d)" >> $GITHUB_OUTPUT
+
+      # ── Duplicate Prevention ──────────────────────────────────────
+      # Cache key is date-based: if today's report was already sent,
+      # the cache hit skips all subsequent steps.
+      - name: Check if report already sent today
+        id: check-sent
+        uses: actions/cache@v4.2.0
+        with:
+          path: .egx_sent_today
+          key: egx-report-${{ steps.date.outputs.today }}
+        continue-on-error: true
+
       - name: Set up Python 3.11
+        if: steps.check-sent.outputs.cache-hit != 'true'
         uses: actions/setup-python@v5.3.0
         with:
           python-version: "3.11"
 
       - name: Cache pip dependencies
+        if: steps.check-sent.outputs.cache-hit != 'true'
         uses: actions/cache@v4.2.0
         with:
           path: ~/.cache/pip
@@ -37,29 +57,59 @@ jobs:
             ${{ runner.os }}-pip-
 
       - name: Install dependencies
+        if: steps.check-sent.outputs.cache-hit != 'true'
         run: pip install -r requirements.txt
 
-      - name: Scan all EGX stocks and send technical analysis report
+      # ── Send Report with Automatic Retry ──────────────────────────
+      # 3 attempts with 60s wait between each.
+      # The bot code also has internal retry (3x with 30s backoff),
+      # so total max attempts = 3 workflow × 3 bot = 9 tries.
+      - name: Send daily report (with automatic retry)
+        if: steps.check-sent.outputs.cache-hit != 'true'
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: python bot.py --scheduled
+        run: |
+          echo "=== EGX Daily Report — $(date -u) ==="
+          for attempt in 1 2 3; do
+            echo ""
+            echo "─── Workflow attempt $attempt of 3 ───"
+            python bot.py --scheduled && {
+              echo "✅ Report sent successfully on attempt $attempt"
+              exit 0
+            }
+            echo "❌ Attempt $attempt failed (exit code $?)"
+            if [ $attempt -lt 3 ]; then
+              echo "⏳ Waiting 60 seconds before retry..."
+              sleep 60
+            fi
+          done
+          echo "❌ All 3 workflow attempts failed"
+          exit 1
         timeout-minutes: 25
 
+      # ── Failure Notification ──────────────────────────────────────
       - name: Notify on failure
-        if: failure()
+        if: failure() && steps.check-sent.outputs.cache-hit != 'true'
         uses: dawidd6/action-send-mail@v3.8.0
         with:
           server-address: smtp.gmail.com
           server-port: 465
           username: ${{ secrets.SMTP_USER }}
           password: ${{ secrets.SMTP_PASS }}
-          subject: "❌ EGX Bot — Workflow Failed"
+          subject: "❌ EGX Bot — Daily Report Failed"
           to: ${{ secrets.NOTIFY_EMAIL }}
           from: EGX Bot
           body: |
-            The EGX Daily Technical Analysis workflow has failed.
-            Check the logs at:
-            https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            The EGX Daily Technical Analysis workflow has failed
+            after 3 automatic retry attempts.
+
+            Date: ${{ steps.date.outputs.today }}
+            Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            Please check:
+            1. Telegram Bot Token is valid
+            2. Gemini API key has quota
+            3. TradingView/data sources are accessible
         continue-on-error: true
