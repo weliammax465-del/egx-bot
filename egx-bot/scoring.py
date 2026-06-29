@@ -21,6 +21,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Optional
 
+import config
 from indicators import StockAnalysis, IndicatorResult
 
 logger = logging.getLogger(__name__)
@@ -415,6 +416,27 @@ def _assess_risk(analysis: StockAnalysis) -> tuple[str, str]:
     return risk, "، ".join(reasons)
 
 
+# ─── Liquidity Gate (فلتر السيولة) ───────────────────────────────────────────
+
+def passes_liquidity_gate(analysis: StockAnalysis) -> tuple[bool, str]:
+    """
+    Check if a stock passes the liquidity gate.
+    السهم لازم يكون تداوله اليومي أكبر من الحد الأدنى للسيولة.
+    Returns: (passes: bool, reason: str)
+    """
+    # Check daily turnover (price * volume)
+    if analysis.current_price > 0 and hasattr(analysis, 'volume') and getattr(analysis, 'volume', 0) > 0:
+        turnover = analysis.current_price * analysis.volume
+        if turnover < config.MIN_TURNOVER_EGP:
+            return False, f"سيولة ضعيفة ({turnover:,.0f} ج.م < {config.MIN_TURNOVER_EGP:,.0f} ج.م)"
+
+    # Check if stock hit price limit (frozen)
+    if hasattr(analysis, 'change_pct') and abs(getattr(analysis, 'change_pct', 0)) >= config.PRICE_LIMIT_THRESHOLD_PCT:
+        return False, f"السهم وصل لحد التذبذب (±{config.PRICE_LIMIT_THRESHOLD_PCT}%) — مجمد"
+
+    return True, "السيولة كافية"
+
+
 # ─── Main Scoring Function ───────────────────────────────────────────────────
 
 def compute_score(
@@ -434,6 +456,22 @@ def compute_score(
     Returns:
         ScoringResult with total score, recommendation, and explainable factors.
     """
+    # Liquidity Gate — reject illiquid stocks before scoring
+    passes_liq, liq_reason = passes_liquidity_gate(analysis)
+    if not passes_liq:
+        return ScoringResult(
+            total_score=0,
+            recommendation="No Trade",
+            recommendation_ar="لا تداول ⚪",
+            factors=[],
+            risk_level="High",
+            risk_reason=liq_reason,
+            data_quality=data_quality,
+            data_freshness=data_freshness,
+            pass_reasons=[],
+            fail_reasons=[f"فلتر السيولة: {liq_reason}"],
+        )
+
     # Compute all factors
     factors = [
         _score_trend(analysis),
@@ -453,20 +491,20 @@ def compute_score(
     # Risk assessment
     risk_level, risk_reason = _assess_risk(analysis)
 
-    # Determine recommendation
-    if data_quality < 0.7:
+    # Determine recommendation using config thresholds
+    if data_quality < config.MIN_DATA_QUALITY:
         recommendation = "No Trade"
         reason = "جودة البيانات غير كافية"
     elif data_freshness == "stale":
         recommendation = "No Trade"
         reason = "البيانات قديمة"
-    elif total >= 70:
+    elif total >= config.BUY_THRESHOLD:
         recommendation = "Buy"
         reason = f"درجة {total}/100 — إشارات صاعدة قوية"
-    elif total >= 50:
+    elif total >= config.WATCH_THRESHOLD:
         recommendation = "Watch"
         reason = f"درجة {total}/100 — إشارات إيجابية ولكن غير مؤكدة"
-    elif total <= 30:
+    elif total <= config.SELL_THRESHOLD:
         recommendation = "Sell"
         reason = f"درجة {total}/100 — إشارات هابطة قوية"
     else:
