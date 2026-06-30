@@ -2,6 +2,14 @@
   "report_date": "2026-06-30",
   "recommendations": [
     {
+      "ticker": "ETRS",
+      "name_ar": "إيجي ترانس",
+      "score": 73,
+      "price": 10.35,
+      "type": "Buy",
+      "risk_level": "High"
+    },
+    {
       "ticker": "CLHO",
       "name_ar": "مستشفيات كليوباترا",
       "score": 71,
@@ -26,26 +34,10 @@
       "risk_level": "Medium"
     },
     {
-      "ticker": "OCDI",
-      "name_ar": "سوديك",
-      "score": 70,
-      "price": 24.31,
-      "type": "Buy",
-      "risk_level": "Medium"
-    },
-    {
       "ticker": "MASR",
       "name_ar": "مدينة مصر",
       "score": 66,
       "price": 7.2,
-      "type": "Watch",
-      "risk_level": "Medium"
-    },
-    {
-      "ticker": "PHAR",
-      "name_ar": "إيبيكو",
-      "score": 67,
-      "price": 84.69,
       "type": "Watch",
       "risk_level": "Medium"
     },
@@ -66,11 +58,27 @@
       "risk_level": "Medium"
     },
     {
-      "ticker": "NINH",
-      "name_ar": "مستشفى النزهة",
-      "score": 75,
-      "price": 17.84,
-      "type": "Buy",
+      "ticker": "OLFI",
+      "name_ar": "أوبور لاند",
+      "score": 67,
+      "price": 22.0,
+      "type": "Watch",
+      "risk_level": "Medium"
+    },
+    {
+      "ticker": "ENGC",
+      "name_ar": "آيكون",
+      "score": 68,
+      "price": 36.39,
+      "type": "Watch",
+      "risk_level": "Medium"
+    },
+    {
+      "ticker": "AJWA",
+      "name_ar": "أجوة",
+      "score": 68,
+      "price": 175.73,
+      "type": "Watch",
       "risk_level": "Medium"
     },
     {
@@ -79,14 +87,6 @@
       "score": 72,
       "price": 28.99,
       "type": "Buy",
-      "risk_level": "High"
-    },
-    {
-      "ticker": "ICID",
-      "name_ar": "International Co. For Investment & Development",
-      "score": 67,
-      "price": 7.59,
-      "type": "Watch",
       "risk_level": "High"
     },
     {
@@ -106,10 +106,18 @@
       "risk_level": "Medium"
     },
     {
-      "ticker": "POUL",
-      "name_ar": "دواجن القاهرة",
-      "score": 69,
-      "price": 37.95,
+      "ticker": "ELWA",
+      "name_ar": "El Wadi for International and Investment Development SAE",
+      "score": 65,
+      "price": 1.97,
+      "type": "Watch",
+      "risk_level": "Medium"
+    },
+    {
+      "ticker": "ORHD",
+      "name_ar": "أوراسكوم للتنمية",
+      "score": 66,
+      "price": 37.65,
       "type": "Watch",
       "risk_level": "Medium"
     },
@@ -138,18 +146,26 @@
       "risk_level": "Medium"
     },
     {
-      "ticker": "ENGC",
-      "name_ar": "آيكون",
-      "score": 66,
-      "price": 36.39,
-      "type": "Watch",
+      "ticker": "ADCI",
+      "name_ar": "الدواء العربي",
+      "score": 71,
+      "price": 243.76,
+      "type": "Buy",
       "risk_level": "Medium"
     },
     {
-      "ticker": "AJWA",
-      "name_ar": "أجوة",
-      "score": 67,
-      "price": 175.73,
+      "ticker": "ZEOT",
+      "name_ar": "الزيوت",
+      "score": 74,
+      "price": 11.15,
+      "type": "Buy",
+      "risk_level": "High"
+    },
+    {
+      "ticker": "ECAP",
+      "name_ar": "Al Ezz Ceramics & Porcelain Co.",
+      "score": 68,
+      "price": 31.95,
       "type": "Watch",
       "risk_level": "Medium"
     },
@@ -170,14 +186,6 @@
       "risk_level": "High"
     },
     {
-      "ticker": "IDRE",
-      "name_ar": "Ismailia Development and Real Estate Co",
-      "score": 73,
-      "price": 41.6,
-      "type": "Buy",
-      "risk_level": "Medium"
-    },
-    {
       "ticker": "CRST",
       "name_ar": "Creast Mark For Contracting And Real Estate Development",
       "score": 66,
@@ -186,10 +194,18 @@
       "risk_level": "High"
     },
     {
-      "ticker": "ORHD",
-      "name_ar": "أوراسكوم للتنمية",
-      "score": 66,
-      "price": 37.65,
+      "ticker": "EASB",
+      "name_ar": "Egyptian Arabian Company (Themar) for securities Brokerage EAC",
+      "score": 77,
+      "price": 7.55,
+      "type": "Buy",
+      "risk_level": "High"
+    },
+    {
+      "ticker": "OCDI",
+      "name_ar": "سوديك",
+      "score": 67,
+      "price": 24.31,
       "type": "Watch",
       "risk_level": "Medium"
     },
@@ -202,6 +218,22 @@
       "risk_level": "Medium"
     },
     {
+      "ticker": "CIRA",
+      "name_ar": "سيرا للتعليم",
+      "score": 67,
+      "price": 27.84,
+      "type": "Watch",
+      "risk_level": "Medium"
+    },
+    {
+      "ticker": "PHAR",
+      "name_ar": "إيبيكو",
+      "score": 62,
+      "price": 84.69,
+      "type": "Watch",
+      "risk_level": "Medium"
+    },
+    {
       "ticker": "ISMQ",
       "name_ar": "مناجم الحديد",
       "score": 69,
@@ -210,26 +242,10 @@
       "risk_level": "Medium"
     },
     {
-      "ticker": "OLFI",
-      "name_ar": "أوبور لاند",
-      "score": 63,
-      "price": 22.0,
-      "type": "Watch",
-      "risk_level": "Medium"
-    },
-    {
-      "ticker": "ZMID",
-      "name_ar": "الزهراء المعادي",
-      "score": 67,
-      "price": 6.2,
-      "type": "Watch",
-      "risk_level": "Medium"
-    },
-    {
-      "ticker": "ARAB",
-      "name_ar": "العربية للتعمير",
-      "score": 71,
-      "price": 0.21,
+      "ticker": "NINH",
+      "name_ar": "مستشفى النزهة",
+      "score": 70,
+      "price": 17.84,
       "type": "Buy",
       "risk_level": "Medium"
     },
@@ -242,52 +258,36 @@
       "risk_level": "Medium"
     },
     {
-      "ticker": "ZEOT",
-      "name_ar": "الزيوت",
-      "score": 72,
-      "price": 11.15,
-      "type": "Buy",
-      "risk_level": "High"
-    },
-    {
-      "ticker": "EASB",
-      "name_ar": "Egyptian Arabian Company (Themar) for securities Brokerage EAC",
-      "score": 74,
-      "price": 7.55,
-      "type": "Buy",
-      "risk_level": "High"
-    },
-    {
-      "ticker": "EEII",
-      "name_ar": "Arab Engineering Industries",
-      "score": 67,
-      "price": 2.36,
+      "ticker": "COPR",
+      "name_ar": "Copper for Commercial Investment & Real Estate Development",
+      "score": 69,
+      "price": 0.35,
       "type": "Watch",
       "risk_level": "Medium"
     },
     {
-      "ticker": "COPR",
-      "name_ar": "Copper for Commercial Investment & Real Estate Development",
-      "score": 71,
-      "price": 0.35,
-      "type": "Buy",
-      "risk_level": "Medium"
-    },
-    {
-      "ticker": "CIRA",
-      "name_ar": "سيرا للتعليم",
+      "ticker": "POUL",
+      "name_ar": "دواجن القاهرة",
       "score": 66,
-      "price": 27.84,
+      "price": 37.95,
       "type": "Watch",
       "risk_level": "Medium"
     },
     {
       "ticker": "PRDC",
       "name_ar": "رواد العقارية",
-      "score": 60,
+      "score": 61,
       "price": 7.16,
       "type": "Watch",
       "risk_level": "High"
+    },
+    {
+      "ticker": "MPRC",
+      "name_ar": "مدينة الإنتاج",
+      "score": 67,
+      "price": 38.21,
+      "type": "Watch",
+      "risk_level": "Medium"
     },
     {
       "ticker": "CNFN",
@@ -298,28 +298,36 @@
       "risk_level": "Medium"
     },
     {
-      "ticker": "OCPH",
-      "name_ar": "أكتوبر فارما",
-      "score": 72,
-      "price": 351.18,
+      "ticker": "KABO",
+      "name_ar": "كابو",
+      "score": 62,
+      "price": 6.26,
+      "type": "Watch",
+      "risk_level": "Medium"
+    },
+    {
+      "ticker": "ARAB",
+      "name_ar": "العربية للتعمير",
+      "score": 70,
+      "price": 0.21,
       "type": "Buy",
       "risk_level": "Medium"
     },
     {
-      "ticker": "ACAMD",
-      "name_ar": "إدارة الأصول العربية",
-      "score": 68,
-      "price": 2.2,
+      "ticker": "UNIT",
+      "name_ar": "المتحدة للإسكان",
+      "score": 67,
+      "price": 12.43,
       "type": "Watch",
-      "risk_level": "Medium"
+      "risk_level": "High"
     },
     {
-      "ticker": "MAAL",
-      "name_ar": "Marseille Almasreia Alkhalegeya For Holding Investment SAE",
-      "score": 67,
-      "price": 7.11,
+      "ticker": "ELSH",
+      "name_ar": "الشمس للإسكان",
+      "score": 61,
+      "price": 11.61,
       "type": "Watch",
-      "risk_level": "Medium"
+      "risk_level": "High"
     },
     {
       "ticker": "CAED",
@@ -330,12 +338,12 @@
       "risk_level": "High"
     },
     {
-      "ticker": "LUTS",
-      "name_ar": "Lotus For Agricultural Investments And Development",
-      "score": 65,
-      "price": 0.72,
+      "ticker": "ARVA",
+      "name_ar": "Arab Valves Company",
+      "score": 69,
+      "price": 10.9,
       "type": "Watch",
-      "risk_level": "Medium"
+      "risk_level": "High"
     },
     {
       "ticker": "GIHD",
@@ -354,52 +362,44 @@
       "risk_level": "Medium"
     },
     {
+      "ticker": "PHDC",
+      "name_ar": "بالم هيلز",
+      "score": 63,
+      "price": 14.65,
+      "type": "Watch",
+      "risk_level": "Medium"
+    },
+    {
       "ticker": "CANA",
       "name_ar": "بنك قناة السويس",
-      "score": 67,
+      "score": 64,
       "price": 35.28,
       "type": "Watch",
       "risk_level": "Medium"
     },
     {
-      "ticker": "RAYA",
-      "name_ar": "رايا القابضة",
-      "score": 63,
-      "price": 7.3,
+      "ticker": "BINV",
+      "name_ar": "استثمارات ب",
+      "score": 61,
+      "price": 45.09,
       "type": "Watch",
       "risk_level": "Medium"
     },
     {
-      "ticker": "AMIA",
-      "name_ar": "عرب ملتقى",
-      "score": 66,
-      "price": 8.48,
+      "ticker": "NIPH",
+      "name_ar": "نايل فارما",
+      "score": 65,
+      "price": 162.3,
       "type": "Watch",
       "risk_level": "Medium"
     },
     {
-      "ticker": "KABO",
-      "name_ar": "كابو",
+      "ticker": "SPIN",
+      "name_ar": "الغزل والنسيج",
       "score": 64,
-      "price": 6.26,
+      "price": 14.2,
       "type": "Watch",
       "risk_level": "Medium"
-    },
-    {
-      "ticker": "ADCI",
-      "name_ar": "الدواء العربي",
-      "score": 67,
-      "price": 243.76,
-      "type": "Watch",
-      "risk_level": "Medium"
-    },
-    {
-      "ticker": "ELSH",
-      "name_ar": "الشمس للإسكان",
-      "score": 60,
-      "price": 11.61,
-      "type": "Watch",
-      "risk_level": "High"
     },
     {
       "ticker": "SDTI",
@@ -418,10 +418,18 @@
       "risk_level": "High"
     },
     {
-      "ticker": "ECAP",
-      "name_ar": "Al Ezz Ceramics & Porcelain Co.",
+      "ticker": "IDRE",
+      "name_ar": "Ismailia Development and Real Estate Co",
+      "score": 68,
+      "price": 41.6,
+      "type": "Watch",
+      "risk_level": "Medium"
+    },
+    {
+      "ticker": "MAAL",
+      "name_ar": "Marseille Almasreia Alkhalegeya For Holding Investment SAE",
       "score": 65,
-      "price": 31.95,
+      "price": 7.11,
       "type": "Watch",
       "risk_level": "Medium"
     },
@@ -434,25 +442,9 @@
       "risk_level": "Medium"
     },
     {
-      "ticker": "GGCC",
-      "name_ar": "Giza General - Contracting and Real Estate Investment S.A.E",
-      "score": 65,
-      "price": 0.46,
-      "type": "Watch",
-      "risk_level": "Medium"
-    },
-    {
-      "ticker": "ARVA",
-      "name_ar": "Arab Valves Company",
-      "score": 69,
-      "price": 10.9,
-      "type": "Watch",
-      "risk_level": "High"
-    },
-    {
       "ticker": "AFDI",
       "name_ar": "Al Ahly for Development & Investment",
-      "score": 62,
+      "score": 64,
       "price": 42.36,
       "type": "Watch",
       "risk_level": "High"
@@ -460,7 +452,7 @@
     {
       "ticker": "SPMD",
       "name_ar": "Speed Medical Co",
-      "score": 63,
+      "score": 65,
       "price": 0.41,
       "type": "Watch",
       "risk_level": "Medium"
@@ -474,14 +466,6 @@
       "risk_level": "Medium"
     },
     {
-      "ticker": "PHDC",
-      "name_ar": "بالم هيلز",
-      "score": 60,
-      "price": 14.65,
-      "type": "Watch",
-      "risk_level": "Medium"
-    },
-    {
       "ticker": "GBCO",
       "name_ar": "جي بي كورب",
       "score": 62,
@@ -490,18 +474,18 @@
       "risk_level": "Medium"
     },
     {
-      "ticker": "BINV",
-      "name_ar": "استثمارات ب",
-      "score": 63,
-      "price": 45.09,
+      "ticker": "HELI",
+      "name_ar": "مدينة هليوبوليس",
+      "score": 62,
+      "price": 6.37,
       "type": "Watch",
       "risk_level": "Medium"
     },
     {
-      "ticker": "MPRC",
-      "name_ar": "مدينة الإنتاج",
-      "score": 64,
-      "price": 38.21,
+      "ticker": "EXPA",
+      "name_ar": "بنك التنمية الصادرات",
+      "score": 55,
+      "price": 18.15,
       "type": "Watch",
       "risk_level": "Medium"
     },
@@ -514,11 +498,11 @@
       "risk_level": "Medium"
     },
     {
-      "ticker": "SPIN",
-      "name_ar": "الغزل والنسيج",
-      "score": 62,
-      "price": 14.2,
-      "type": "Watch",
+      "ticker": "OCPH",
+      "name_ar": "أكتوبر فارما",
+      "score": 70,
+      "price": 351.18,
+      "type": "Buy",
       "risk_level": "Medium"
     },
     {
@@ -530,10 +514,10 @@
       "risk_level": "High"
     },
     {
-      "ticker": "SNFC",
-      "name_ar": "أمن الغذاء بالشرقية",
-      "score": 63,
-      "price": 12.04,
+      "ticker": "ACAMD",
+      "name_ar": "إدارة الأصول العربية",
+      "score": 59,
+      "price": 2.2,
       "type": "Watch",
       "risk_level": "Medium"
     },
@@ -546,6 +530,14 @@
       "risk_level": "Medium"
     },
     {
+      "ticker": "AALR",
+      "name_ar": "General Company For Land Reclamation, Development & Reconstruction",
+      "score": 63,
+      "price": 201.11,
+      "type": "Watch",
+      "risk_level": "Medium"
+    },
+    {
       "ticker": "COSG",
       "name_ar": "Cairo Oil & Soap Company",
       "score": 62,
@@ -554,18 +546,26 @@
       "risk_level": "Medium"
     },
     {
-      "ticker": "SEIG",
-      "name_ar": "Saudi Egyptian Investment & Finance Co. S.A.E",
-      "score": 63,
-      "price": 183.92,
+      "ticker": "UNIP",
+      "name_ar": "Universal For Paper and Packaging Materials",
+      "score": 53,
+      "price": 0.32,
+      "type": "Watch",
+      "risk_level": "High"
+    },
+    {
+      "ticker": "CCRS",
+      "name_ar": "Gulf Canadian Company for Arab Real Estate Investment",
+      "score": 58,
+      "price": 2.22,
       "type": "Watch",
       "risk_level": "Medium"
     },
     {
-      "ticker": "TMGH",
-      "name_ar": "طلعت مصطفى",
-      "score": 57,
-      "price": 92.36,
+      "ticker": "TRTO",
+      "name_ar": "Trans Oceans Tours",
+      "score": 61,
+      "price": 0.03,
       "type": "Watch",
       "risk_level": "Medium"
     },
@@ -578,30 +578,6 @@
       "risk_level": "Medium"
     },
     {
-      "ticker": "HELI",
-      "name_ar": "مدينة هليوبوليس",
-      "score": 64,
-      "price": 6.37,
-      "type": "Watch",
-      "risk_level": "Medium"
-    },
-    {
-      "ticker": "EXPA",
-      "name_ar": "بنك التنمية الصادرات",
-      "score": 53,
-      "price": 18.15,
-      "type": "Watch",
-      "risk_level": "Medium"
-    },
-    {
-      "ticker": "VALU",
-      "name_ar": "فاليو",
-      "score": 54,
-      "price": 11.69,
-      "type": "Watch",
-      "risk_level": "Medium"
-    },
-    {
       "ticker": "TAQA",
       "name_ar": "طاقة",
       "score": 56,
@@ -610,10 +586,10 @@
       "risk_level": "Medium"
     },
     {
-      "ticker": "NIPH",
-      "name_ar": "نايل فارما",
-      "score": 59,
-      "price": 162.3,
+      "ticker": "AMIA",
+      "name_ar": "عرب ملتقى",
+      "score": 64,
+      "price": 8.48,
       "type": "Watch",
       "risk_level": "Medium"
     },
@@ -634,18 +610,10 @@
       "risk_level": "Medium"
     },
     {
-      "ticker": "MPCO",
-      "name_ar": "Mansoura Poultry co.S.A.E",
-      "score": 62,
-      "price": 1.74,
-      "type": "Watch",
-      "risk_level": "Medium"
-    },
-    {
-      "ticker": "EHDR",
-      "name_ar": "Egyptians for Housing & Development Co.",
-      "score": 57,
-      "price": 2.42,
+      "ticker": "SNFC",
+      "name_ar": "أمن الغذاء بالشرقية",
+      "score": 60,
+      "price": 12.04,
       "type": "Watch",
       "risk_level": "Medium"
     },
@@ -658,26 +626,26 @@
       "risk_level": "Medium"
     },
     {
-      "ticker": "NCCW",
-      "name_ar": "Nasr Company for Civil Works",
-      "score": 59,
-      "price": 5.9,
+      "ticker": "SEIG",
+      "name_ar": "Saudi Egyptian Investment & Finance Co. S.A.E",
+      "score": 61,
+      "price": 183.92,
       "type": "Watch",
       "risk_level": "Medium"
     },
     {
-      "ticker": "CCRS",
-      "name_ar": "Gulf Canadian Company for Arab Real Estate Investment",
-      "score": 57,
-      "price": 2.22,
+      "ticker": "TMGH",
+      "name_ar": "طلعت مصطفى",
+      "score": 60,
+      "price": 92.36,
       "type": "Watch",
       "risk_level": "Medium"
     },
     {
-      "ticker": "EMFD",
-      "name_ar": "عمار مصر",
-      "score": 62,
-      "price": 11.43,
+      "ticker": "CICH",
+      "name_ar": "سي آي كابيتال",
+      "score": 52,
+      "price": 11.76,
       "type": "Watch",
       "risk_level": "Medium"
     },
@@ -690,14 +658,6 @@
       "risk_level": "Medium"
     },
     {
-      "ticker": "GOUR",
-      "name_ar": "جورميه",
-      "score": 60,
-      "price": 12.21,
-      "type": "Watch",
-      "risk_level": "Medium"
-    },
-    {
       "ticker": "MFSC",
       "name_ar": "محلات مصر الحرة",
       "score": 58,
@@ -706,20 +666,12 @@
       "risk_level": "High"
     },
     {
-      "ticker": "MICH",
-      "name_ar": "الكيماويات المصرية صناعات",
-      "score": 57,
-      "price": 36.21,
+      "ticker": "EHDR",
+      "name_ar": "Egyptians for Housing & Development Co.",
+      "score": 55,
+      "price": 2.42,
       "type": "Watch",
       "risk_level": "Medium"
-    },
-    {
-      "ticker": "MOSC",
-      "name_ar": "Misr Oils & Soap",
-      "score": 65,
-      "price": 284.78,
-      "type": "Watch",
-      "risk_level": "High"
     },
     {
       "ticker": "MILS",
@@ -730,14 +682,6 @@
       "risk_level": "High"
     },
     {
-      "ticker": "AALR",
-      "name_ar": "General Company For Land Reclamation, Development & Reconstruction",
-      "score": 61,
-      "price": 201.11,
-      "type": "Watch",
-      "risk_level": "Medium"
-    },
-    {
       "ticker": "PRMH",
       "name_ar": "Prime Holding S.A.E",
       "score": 54,
@@ -746,10 +690,18 @@
       "risk_level": "High"
     },
     {
-      "ticker": "MTIE",
-      "name_ar": "مجموعة أم أم",
-      "score": 51,
-      "price": 8.9,
+      "ticker": "TANM",
+      "name_ar": "Tanmiya For Real Estate Investment (S.A.E)",
+      "score": 54,
+      "price": 4.98,
+      "type": "Watch",
+      "risk_level": "Medium"
+    },
+    {
+      "ticker": "KZPC",
+      "name_ar": "كفر الزيات",
+      "score": 50,
+      "price": 8.4,
       "type": "Watch",
       "risk_level": "Medium"
     },
@@ -762,22 +714,6 @@
       "risk_level": "Medium"
     },
     {
-      "ticker": "UNIP",
-      "name_ar": "Universal For Paper and Packaging Materials",
-      "score": 52,
-      "price": 0.32,
-      "type": "Watch",
-      "risk_level": "High"
-    },
-    {
-      "ticker": "ASPI",
-      "name_ar": "Aspire Capital Holding for Financial Investments",
-      "score": 56,
-      "price": 0.3,
-      "type": "Watch",
-      "risk_level": "High"
-    },
-    {
       "ticker": "KWIN",
       "name_ar": "El Kahera El Watania Investment",
       "score": 51,
@@ -786,12 +722,20 @@
       "risk_level": "High"
     },
     {
-      "ticker": "SCEM",
-      "name_ar": "أسمنت سيناء",
-      "score": 50,
-      "price": 60.96,
+      "ticker": "EMFD",
+      "name_ar": "عمار مصر",
+      "score": 57,
+      "price": 11.43,
       "type": "Watch",
       "risk_level": "Medium"
+    },
+    {
+      "ticker": "EGTS",
+      "name_ar": "المنتجعات المصرية",
+      "score": 53,
+      "price": 16.98,
+      "type": "Watch",
+      "risk_level": "High"
     },
     {
       "ticker": "RMDA",
@@ -804,32 +748,16 @@
     {
       "ticker": "MCRO",
       "name_ar": "Macro Group Pharmaceuticals (Macro Capital) S.A.E",
-      "score": 57,
+      "score": 50,
       "price": 1.19,
       "type": "Watch",
       "risk_level": "Medium"
     },
     {
-      "ticker": "ADIB",
-      "name_ar": "بنك أبوظبي الإسلامي",
-      "score": 52,
-      "price": 45.35,
-      "type": "Watch",
-      "risk_level": "Medium"
-    },
-    {
-      "ticker": "EGTS",
-      "name_ar": "المنتجعات المصرية",
-      "score": 52,
-      "price": 16.98,
-      "type": "Watch",
-      "risk_level": "High"
-    },
-    {
-      "ticker": "ISPH",
-      "name_ar": "ابن سينا فارما",
-      "score": 51,
-      "price": 11.45,
+      "ticker": "ETEL",
+      "name_ar": "المصرية للاتصالات",
+      "score": 50,
+      "price": 90.0,
       "type": "Watch",
       "risk_level": "Medium"
     },
@@ -838,6 +766,22 @@
       "name_ar": "تعليم",
       "score": 53,
       "price": 15.6,
+      "type": "Watch",
+      "risk_level": "Medium"
+    },
+    {
+      "ticker": "MOIN",
+      "name_ar": "مهندس للتأمين",
+      "score": 50,
+      "price": 23.03,
+      "type": "Watch",
+      "risk_level": "Medium"
+    },
+    {
+      "ticker": "SAUD",
+      "name_ar": "بنك البركة",
+      "score": 50,
+      "price": 20.43,
       "type": "Watch",
       "risk_level": "Medium"
     },
@@ -851,205 +795,194 @@
     }
   ],
   "current_prices": {
+    "ETRS": 10.35,
     "CLHO": 16.16,
     "ROTO": 40.82,
     "HDBK": 155.1,
-    "OCDI": 24.31,
     "MASR": 7.2,
-    "PHAR": 84.69,
     "MHOT": 33.99,
     "CSAG": 32.26,
-    "NINH": 17.84,
+    "OLFI": 22.0,
+    "ENGC": 36.39,
+    "AJWA": 175.73,
     "ISMA": 28.99,
-    "ICID": 7.59,
     "RUBX": 11.22,
     "AREH": 1.53,
-    "POUL": 37.95,
+    "ELWA": 1.97,
+    "ORHD": 37.65,
     "DOMT": 26.86,
     "CPCI": 388.12,
     "MPCI": 238.0,
-    "ENGC": 36.39,
-    "AJWA": 175.73,
+    "ADCI": 243.76,
+    "ZEOT": 11.15,
+    "ECAP": 31.95,
     "TYCN": 30.9,
     "PRCL": 30.8,
-    "IDRE": 41.6,
     "CRST": 1.33,
-    "ELWA": 1.97,
-    "ORHD": 37.65,
-    "FAIT": 35.91,
-    "EGBE": 0.45,
-    "ISMQ": 9.12,
-    "OLFI": 22.0,
-    "ZMID": 6.2,
-    "ARAB": 0.21,
-    "LCSW": 27.9,
-    "ZEOT": 11.15,
     "EASB": 7.55,
-    "EEII": 2.36,
-    "COPR": 0.35,
+    "OCDI": 24.31,
+    "FAIT": 35.91,
     "CIRA": 27.84,
+    "PHAR": 84.69,
+    "ISMQ": 9.12,
+    "NINH": 17.84,
+    "LCSW": 27.9,
+    "COPR": 0.35,
+    "POUL": 37.95,
+    "EGBE": 0.45,
     "PRDC": 7.16,
+    "MPRC": 38.21,
     "CNFN": 4.68,
-    "OCPH": 351.18,
-    "ACAMD": 2.2,
-    "MAAL": 7.11,
+    "KABO": 6.26,
+    "ARAB": 0.21,
+    "UNIT": 12.43,
+    "ELSH": 11.61,
+    "NDRL": 4.69,
     "CAED": 70.46,
-    "LUTS": 0.72,
+    "ARVA": 10.9,
     "GIHD": 40.99,
     "GMCI": 1.77,
+    "PHDC": 14.65,
     "CANA": 35.28,
-    "RAYA": 7.3,
-    "AMIA": 8.48,
-    "KABO": 6.26,
-    "ADCI": 243.76,
-    "ELSH": 11.61,
+    "BINV": 45.09,
+    "NIPH": 162.3,
+    "MIPH": 651.64,
+    "SPIN": 14.2,
     "SDTI": 46.02,
     "NARE": 13.71,
-    "ECAP": 31.95,
+    "IDRE": 41.6,
+    "MAAL": 7.11,
     "ODIN": 2.07,
-    "GGCC": 0.46,
-    "ARVA": 10.9,
     "AFDI": 42.36,
     "SPMD": 0.41,
     "QNBE": 51.91,
-    "PHDC": 14.65,
     "GBCO": 31.45,
-    "MOIL": 0.46,
-    "BINV": 45.09,
-    "MPRC": 38.21,
-    "PHTV": 270.0,
-    "SPIN": 14.2,
-    "ASCM": 58.0,
-    "ATLC": 4.99,
-    "SNFC": 12.04,
-    "MENA": 6.82,
-    "COSG": 1.5,
-    "SEIG": 183.92,
-    "MEGM": 12.54,
-    "TRTO": 0.03,
-    "TMGH": 92.36,
-    "JUFO": 29.25,
     "HELI": 6.37,
     "EXPA": 18.15,
-    "VALU": 11.69,
-    "TAQA": 14.72,
-    "NIPH": 162.3,
-    "SPHT": 1.91,
-    "MIPH": 651.64,
-    "AXPH": 1117.31,
-    "SVCE": 8.86,
-    "ACGC": 9.15,
-    "MPCO": 1.74,
-    "EHDR": 2.42,
-    "CERA": 1.2,
-    "NCCW": 5.9,
-    "CCRS": 2.22,
-    "EMFD": 11.43,
-    "EGAS": 48.42,
-    "GOUR": 12.21,
-    "MFSC": 47.33,
-    "MICH": 36.21,
-    "NAHO": 0.1,
-    "MOSC": 284.78,
-    "MILS": 127.26,
+    "MOIL": 0.46,
+    "PHTV": 270.0,
+    "OCPH": 351.18,
+    "ASCM": 58.0,
+    "ACAMD": 2.2,
+    "MENA": 6.82,
     "AALR": 201.11,
+    "COSG": 1.5,
+    "UNIP": 0.32,
+    "CCRS": 2.22,
+    "TRTO": 0.03,
+    "JUFO": 29.25,
+    "TAQA": 14.72,
+    "SPHT": 1.91,
+    "AXPH": 1117.31,
+    "AMIA": 8.48,
+    "SVCE": 8.86,
+    "SAIB": 2.11,
+    "ACGC": 9.15,
+    "SNFC": 12.04,
+    "CERA": 1.2,
+    "SEIG": 183.92,
+    "TMGH": 92.36,
+    "CICH": 11.76,
+    "EGAS": 48.42,
+    "MFSC": 47.33,
+    "DAPH": 80.48,
+    "EHDR": 2.42,
+    "DEIN": 11.38,
+    "MILS": 127.26,
     "SEIGA": 0.95,
     "EBSC": 1.74,
     "PRMH": 2.5,
+    "MEGM": 12.54,
     "TANM": 4.98,
+    "CPME": 19.88,
+    "SWDY": 85.01,
     "ORAS": 703.99,
     "IRON": 32.31,
-    "MTIE": 8.9,
-    "DAPH": 80.48,
-    "UEGC": 1.36,
-    "RREI": 3.4,
-    "UNIP": 0.32,
-    "ASPI": 0.3,
-    "KWIN": 67.53,
-    "NEDA": 2.74,
-    "FAITA": 0.98,
-    "SCEM": 60.96,
-    "CICH": 11.76,
-    "RMDA": 4.9,
-    "OIH": 1.41,
-    "WKOL": 280.06,
-    "MCRO": 1.19,
-    "SWDY": 85.01,
-    "ETEL": 90.0,
-    "ADIB": 45.35,
-    "BTFH": 2.98,
-    "EFIC": 189.13,
-    "EGTS": 16.98,
-    "EGSA": 8.75,
-    "UEFM": 470.0,
     "KZPC": 8.4,
     "EDFM": 330.59,
-    "EAST": 37.0,
-    "ABUK": 66.9,
-    "FERC": 72.96,
+    "RREI": 3.4,
+    "ICLE": 15.76,
+    "KWIN": 67.53,
+    "EMFD": 11.43,
+    "VLMR": 0.66,
+    "FAITA": 0.98,
+    "EGTS": 16.98,
+    "MTIE": 8.9,
     "ISPH": 11.45,
-    "TALM": 15.6,
-    "AMER": 2.32,
+    "RMDA": 4.9,
+    "NAHO": 0.1,
+    "WKOL": 280.06,
+    "MCRO": 1.19,
+    "RAKT": 22.43,
+    "COMI": 126.89,
+    "CIEB": 23.59,
+    "ARCC": 53.76,
+    "EGSA": 8.75,
+    "UEFM": 470.0,
     "EALR": 341.31,
     "GTEX": 0.03,
-    "RAKT": 22.43,
-    "EFIH": 20.19,
-    "VLMR": 0.66,
-    "CIEB": 23.59,
+    "NEDA": 2.74,
+    "ETEL": 90.0,
+    "ABUK": 66.9,
+    "BTFH": 2.98,
+    "FERC": 72.96,
     "EGCH": 12.16,
-    "CCAP": 4.74,
-    "ARCC": 53.76,
-    "UBEE": 13.3,
-    "BONY": 4.73,
+    "SCEM": 60.96,
+    "TALM": 15.6,
+    "OIH": 1.41,
+    "MOIN": 23.03,
     "DSCW": 1.72,
-    "GDWA": 0.77,
-    "ADPC": 3.37,
-    "CEFM": 96.96,
-    "SIPC": 3.26,
-    "KRDI": 0.34,
-    "EPCO": 8.56,
-    "FWRY": 18.3,
-    "VLMRA": 27.7,
-    "MCQE": 168.76,
-    "SAUD": 20.43,
-    "AMOC": 7.52,
-    "SUGR": 46.05,
-    "BIOC": 68.17,
-    "CFGH": 0.1,
+    "AMER": 2.32,
     "RACC": 9.54,
     "ALUM": 20.77,
-    "COMI": 126.89,
-    "MFPC": 34.59,
-    "EFID": 27.07,
+    "SIPC": 3.26,
+    "EFIH": 20.19,
+    "CCAP": 4.74,
     "SKPC": 15.89,
+    "MCQE": 168.76,
+    "SAUD": 20.43,
+    "UBEE": 13.3,
+    "BONY": 4.73,
+    "GDWA": 0.77,
+    "AFMC": 67.39,
+    "GGRN": 1.36,
+    "ADPC": 3.37,
+    "CEFM": 96.96,
+    "EAST": 37.0,
+    "MFPC": 34.59,
+    "FWRY": 18.3,
+    "VLMRA": 27.7,
     "ATQA": 9.36,
+    "SUGR": 46.05,
+    "BIOC": 68.17,
+    "GSSC": 241.29,
+    "CFGH": 0.1,
+    "MEPA": 1.54,
+    "RTVC": 3.65,
+    "KRDI": 0.34,
+    "EPCO": 8.56,
+    "HRHO": 26.52,
+    "EFID": 27.07,
     "IFAP": 19.03,
     "ELEC": 2.06,
-    "GSSC": 241.29,
     "WCDF": 518.05,
-    "AFMC": 67.39,
+    "OFH": 0.58,
     "INFI": 88.63,
+    "SCFM": 237.01,
     "OBRI": 32.19,
-    "RTVC": 3.65,
-    "APSW": 8.01,
-    "MOED": 0.65,
-    "EGAL": 275.0,
     "ALCN": 27.7,
-    "HRHO": 26.52,
     "ORWE": 22.15,
     "MBSC": 229.86,
-    "OFH": 0.58,
-    "GGRN": 1.36,
-    "SCFM": 237.01,
     "GRCA": 52.78,
     "SMFR": 190.82,
-    "MEPA": 1.54,
-    "DGTZ": 2.49
+    "MOED": 0.65,
+    "DGTZ": 2.49,
+    "AMOC": 7.52
   },
-  "total_stocks_scanned": 194,
-  "total_recommendations": 106,
-  "buy_count": 17,
-  "watch_count": 89,
+  "total_stocks_scanned": 183,
+  "total_recommendations": 99,
+  "buy_count": 16,
+  "watch_count": 83,
   "sell_count": 0,
-  "no_trade_count": 88
+  "no_trade_count": 84
 }
