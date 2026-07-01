@@ -203,20 +203,31 @@ def build_telegram_message(
 
 
 def build_stocks_table_message(stocks: list[StockAnalysis]) -> str:
-    """Detailed stock table with scores, signals, and data freshness."""
-    lines = ["📊 *تفاصيل الأسهم — درجات وتوصيات*", ""]
+    """
+    Detailed stock table with v2 scores, signals, stop-loss, target, R/R ratio.
+    Shows exclusion reasons for filtered-out stocks (analytics transparency).
+    """
+    lines = ["📊 *تفاصيل الأسهم — نظام Liquidity-First v2*", ""]
 
-    # Get scored stocks sorted by score
-    scored = [s for s in stocks if s.scoring_result is not None and s.data_quality >= 0.5]
-    scored.sort(key=lambda x: x.scoring_result.total_score, reverse=True)
+    # Separate by recommendation
+    def _rec(s):
+        return s.scoring_result.recommendation if s.scoring_result else "No Trade"
 
-    top_buy = [s for s in scored if s.scoring_result.recommendation == "Buy"][:10]
-    top_watch = [s for s in scored if s.scoring_result.recommendation == "Watch"][:5]
-    top_sell = [s for s in scored if s.scoring_result.recommendation == "Sell"][:5]
+    top_buy   = [s for s in stocks if _rec(s) == "Buy"][:10]
+    top_watch = [s for s in stocks if _rec(s) == "Watch"][:5]
+    top_sell  = [s for s in stocks if _rec(s) == "Sell"][:5]
+    excluded  = [s for s in stocks if _rec(s) == "No Trade"
+                 and s.scoring_result and s.scoring_result.exclusion_reason][:8]
 
     if not top_buy and not top_watch and not top_sell:
         lines.append("⚪ لا توجد فرص تداول مؤكدة اليوم.")
-        lines.append("البيانات غير كافية أو الإشارات غير واضحة.")
+        lines.append("لا يوجد سهم اجتاز فلاتر السيولة والتأكيد وإدارة المخاطر.")
+        lines.append("")
+        if excluded:
+            lines.append(f"🚫 تم استبعاد {len(excluded)} سهم:")
+            for s in excluded[:5]:
+                excl = s.scoring_result.exclusion_reason
+                lines.append(f"   • {_escape_markdown(s.ticker)}: {_escape_markdown(excl)}")
         lines.append("")
         lines.append("─────────────────────")
         return "\n".join(lines)
@@ -226,13 +237,15 @@ def build_stocks_table_message(stocks: list[StockAnalysis]) -> str:
         lines.append("")
         for i, s in enumerate(top_buy, 1):
             sr = s.scoring_result
+            price_str = f"{s.current_price:.2f}"
             lines.append(f"{i}. *{_escape_markdown(s.name_ar)}* ({_escape_markdown(s.ticker)})")
-            lines.append(f"   السعر: {_escape_markdown(str(s.current_price))} | درجة: {sr.total_score}/100")
-            lines.append(f"   المخاطرة: {_escape_markdown(sr.risk_level)} | البيانات: {_escape_markdown(sr.data_freshness)}")
+            lines.append(f"   💰 السعر: {price_str} EGP | 🎯 درجة: {sr.total_score}/100")
+            # v2 risk management info
+            if sr.stop_loss and sr.stop_loss > 0:
+                lines.append(f"   🛑 وقف الخسارة: {sr.stop_loss:.2f} | 🎯 الهدف: {sr.target:.2f}")
+                lines.append(f"   📐 نسبة R/R: {sr.rr_ratio:.1f}:1 | ⚠️ المخاطرة: {_escape_markdown(sr.risk_level)}")
             if sr.pass_reasons:
                 lines.append(f"   ✅ {_escape_markdown(sr.pass_reasons[0])}")
-            if s.support > 0:
-                lines.append(f"   📌 دعم: {s.support} | مقاومة: {s.resistance}")
             lines.append("")
 
     if top_watch:
@@ -241,95 +254,127 @@ def build_stocks_table_message(stocks: list[StockAnalysis]) -> str:
         for i, s in enumerate(top_watch, 1):
             sr = s.scoring_result
             lines.append(f"{i}. *{_escape_markdown(s.name_ar)}* ({_escape_markdown(s.ticker)})")
-            lines.append(f"   السعر: {_escape_markdown(str(s.current_price))} | درجة: {sr.total_score}/100")
+            lines.append(f"   💰 {s.current_price:.2f} EGP | 🎯 {sr.total_score}/100")
+            if sr.stop_loss and sr.stop_loss > 0:
+                lines.append(f"   🛑 وقف: {sr.stop_loss:.2f} | 🎯 هدف: {sr.target:.2f} | R/R: {sr.rr_ratio:.1f}:1")
             if sr.pass_reasons:
                 lines.append(f"   👀 {_escape_markdown(sr.pass_reasons[0])}")
             lines.append("")
 
     if top_sell:
-        lines.append("🔴 *بيع (درجة 30 أو أقل):*")
+        lines.append("🔴 *بيع / تجنب (درجة 30 أو أقل):*")
         lines.append("")
         for i, s in enumerate(top_sell, 1):
             sr = s.scoring_result
             lines.append(f"{i}. *{_escape_markdown(s.name_ar)}* ({_escape_markdown(s.ticker)})")
-            lines.append(f"   السعر: {_escape_markdown(str(s.current_price))} | درجة: {sr.total_score}/100")
+            lines.append(f"   💰 {s.current_price:.2f} EGP | 🎯 {sr.total_score}/100")
             if sr.fail_reasons:
                 lines.append(f"   ⚠️ {_escape_markdown(sr.fail_reasons[0])}")
             lines.append("")
 
+    # Exclusion summary (analytics transparency — shows users WHY stocks were filtered)
+    if excluded:
+        lines.append("🚫 *مستبعدة من الفلاتر:*")
+        lines.append("")
+        for s in excluded:
+            excl = s.scoring_result.exclusion_reason or "استبعاد تلقائي"
+            lines.append(f"   • {_escape_markdown(s.ticker)}: {_escape_markdown(excl)}")
+        lines.append("")
+
     lines += [
         "─────────────────────",
         "🔗 المصادر: TradingView | stockanalysis.com",
-        "⏰ البيانات قد تتأخر — تأكد قبل اتخاذ أي قرار",
+        "⏰ البيانات تقريبية — تأكد قبل اتخاذ أي قرار",
+        "⚠️ هذه ليست نصيحة استثمارية",
     ]
 
     return _safe_truncate("\n".join(lines), 4000)
 
 
 def format_stock_detail(stock: StockAnalysis) -> str:
-    """Format a single stock's full analysis for /stock command."""
+    """
+    Full single-stock analysis card for /stock command.
+    Shows v2 score, recommendation, stop-loss, target, R/R, indicators.
+    If excluded by a filter, shows the exclusion reason clearly.
+    """
+    change_sign = "+" if stock.daily_change_pct >= 0 else ""
+    vol_str = f"{int(stock.volume):,}" if stock.volume > 0 else "غير متاح"
+
     lines = [
         f"📊 *{_escape_markdown(stock.name_ar)}* ({_escape_markdown(stock.ticker)})",
         "",
-        f"💰 السعر: {_escape_markdown(str(stock.current_price))} EGP",
-        f"📈 التغيير: {_escape_markdown(str(stock.daily_change_pct))}%",
-        f"📦 الحجم: {stock.volume:,}",
+        f"💰 السعر: *{stock.current_price:.2f} EGP*",
+        f"📈 التغيير: {change_sign}{stock.daily_change_pct:.2f}%",
+        f"📦 الحجم: {vol_str}",
         "",
     ]
 
     if stock.scoring_result is not None:
         sr = stock.scoring_result
-        lines += [
-            f"🎯 الدرجة: *{sr.total_score}/100*",
-            f"📋 التوصية: {sr.recommendation_ar}",
-            f"⚠️ المخاطرة: {_escape_markdown(sr.risk_level)} — {_escape_markdown(sr.risk_reason)}",
-            f"🔄 البيانات: {_escape_markdown(sr.data_freshness)} (جودة: {sr.data_quality:.0%})",
-            "",
-        ]
 
-        if sr.pass_reasons:
-            lines.append("✅ *عوامل إيجابية:*")
-            for r in sr.pass_reasons[:4]:
-                lines.append(f"   • {_escape_markdown(r)}")
+        # If stock was excluded by a filter — show that prominently
+        if sr.exclusion_reason:
+            lines += [
+                f"🚫 *مستبعد من التوصيات*",
+                f"   السبب: {_escape_markdown(sr.exclusion_reason)}",
+                "",
+                f"🎯 الدرجة: {sr.total_score}/100",
+                f"🔄 البيانات: {_escape_markdown(sr.data_freshness)} (جودة: {sr.data_quality:.0%})",
+                "",
+            ]
+        else:
+            lines += [
+                f"🎯 الدرجة: *{sr.total_score}/100*",
+                f"📋 التوصية: {sr.recommendation_ar}",
+                "",
+            ]
+
+            # v2 Risk Management block (only if computed)
+            if sr.stop_loss and sr.stop_loss > 0:
+                lines += [
+                    "⚖️ *إدارة المخاطر (v2):*",
+                    f"   🛑 وقف الخسارة: *{sr.stop_loss:.2f} EGP*",
+                    f"   🎯 الهدف (مقاومة): *{sr.target:.2f} EGP*",
+                    f"   📐 نسبة المكسب/الخسارة: *{sr.rr_ratio:.1f}:1*",
+                    f"   ⚠️ المخاطرة: {_escape_markdown(sr.risk_level)} — {_escape_markdown(sr.risk_reason)}",
+                    "",
+                ]
+
+            lines.append(f"🔄 البيانات: {_escape_markdown(sr.data_freshness)} (جودة: {sr.data_quality:.0%})")
             lines.append("")
 
-        if sr.fail_reasons:
-            lines.append("❌ *عوامل سلبية:*")
-            for r in sr.fail_reasons[:4]:
-                lines.append(f"   • {_escape_markdown(r)}")
-            lines.append("")
+            if sr.pass_reasons:
+                lines.append("✅ *عوامل إيجابية:*")
+                for r in sr.pass_reasons[:4]:
+                    lines.append(f"   • {_escape_markdown(r)}")
+                lines.append("")
 
+            if sr.fail_reasons:
+                lines.append("❌ *عوامل سلبية:*")
+                for r in sr.fail_reasons[:4]:
+                    lines.append(f"   • {_escape_markdown(r)}")
+                lines.append("")
+
+    # Support / Resistance from indicators
     if stock.support > 0 or stock.resistance > 0:
-        lines.append("📌 *المستويات:*")
+        lines.append("📌 *مستويات السعر:*")
         if stock.support > 0:
-            lines.append(f"   دعم: {stock.support}")
+            lines.append(f"   دعم: {stock.support:.2f}")
         if stock.resistance > 0:
-            lines.append(f"   مقاومة: {stock.resistance}")
-        if stock.risk_reward_ratio > 0:
-            lines.append(f"   نسبة مخاطرة/عائد: {stock.risk_reward_ratio:.1f}:1")
+            lines.append(f"   مقاومة: {stock.resistance:.2f}")
         lines.append("")
 
+    # Technical indicators
     if stock.indicators:
         lines.append("🔬 *المؤشرات التقنية:*")
-        for ind in stock.indicators:
-            lines.append(f"   {ind.name_ar}: {ind.value} ({ind.signal_text}) — {ind.note}")
-        lines.append("")
-
-    if stock.bullish_reasons:
-        lines.append("🟢 *أسباب الصعود:*")
-        for r in stock.bullish_reasons[:4]:
-            lines.append(f"   • {_escape_markdown(r)}")
-        lines.append("")
-
-    if stock.bearish_reasons:
-        lines.append("🔴 *أسباب الهبوط:*")
-        for r in stock.bearish_reasons[:4]:
-            lines.append(f"   • {_escape_markdown(r)}")
+        for ind in stock.indicators[:12]:
+            lines.append(f"   {ind.name_ar}: {ind.value} ({ind.signal_text})")
         lines.append("")
 
     lines += [
         "─────────────────────",
-        "🔗 المصدر: TradingView + stockanalysis.com",
+        "🔗 TradingView + stockanalysis.com",
+        "⚠️ للمعلومات فقط — ليست نصيحة استثمارية",
     ]
 
     return _safe_truncate("\n".join(lines), 4000)

@@ -374,32 +374,53 @@ def save_recommendations_json(stocks: list, report_date: str) -> str:
         if s.current_price > 0:
             current_prices[s.ticker] = round(s.current_price, 2)
         
-        # Only save actionable recommendations (Buy, Watch, Sell) — not "No Trade"
+        # Save actionable recommendations (Buy, Watch, Sell) + excluded stocks for analytics
         if s.scoring_result and s.scoring_result.recommendation in ("Buy", "Watch", "Sell"):
+            sr = s.scoring_result
             recommendations.append({
                 "ticker": s.ticker,
                 "name_ar": s.name_ar,
-                "score": s.scoring_result.total_score,
+                "score": sr.total_score,
                 "price": round(s.current_price, 2),
-                "type": s.scoring_result.recommendation,
-                "risk_level": s.scoring_result.risk_level,
+                "type": sr.recommendation,
+                "risk_level": sr.risk_level,
+                # v2 risk management fields
+                "stop_loss": round(sr.stop_loss, 2) if sr.stop_loss else 0.0,
+                "target": round(sr.target, 2) if sr.target else 0.0,
+                "rr_ratio": round(sr.rr_ratio, 2) if sr.rr_ratio else 0.0,
+            })
+        elif s.scoring_result and s.scoring_result.exclusion_reason:
+            # Track excluded stocks for filter analytics
+            sr = s.scoring_result
+            recommendations.append({
+                "ticker": s.ticker,
+                "name_ar": s.name_ar,
+                "score": 0,
+                "price": round(s.current_price, 2),
+                "type": "Excluded",
+                "exclusion_reason": sr.exclusion_reason,
+                "stop_loss": 0.0,
+                "target": 0.0,
+                "rr_ratio": 0.0,
             })
     
-    # Count by recommendation type
-    buy_count = sum(1 for r in recommendations if r["type"] == "Buy")
-    watch_count = sum(1 for r in recommendations if r["type"] == "Watch")
-    sell_count = sum(1 for r in recommendations if r["type"] == "Sell")
-    no_trade_count = len(stocks) - len(recommendations)
+    # Count by recommendation type (exclude "Excluded" from actionable counts)
+    buy_count      = sum(1 for r in recommendations if r["type"] == "Buy")
+    watch_count    = sum(1 for r in recommendations if r["type"] == "Watch")
+    sell_count     = sum(1 for r in recommendations if r["type"] == "Sell")
+    excluded_count = sum(1 for r in recommendations if r["type"] == "Excluded")
+    no_trade_count = len(stocks) - buy_count - watch_count - sell_count - excluded_count
 
     data = {
         "report_date": report_date,
         "recommendations": recommendations,
         "current_prices": current_prices,
         "total_stocks_scanned": len(stocks),
-        "total_recommendations": len(recommendations),
+        "total_recommendations": buy_count + watch_count + sell_count,
         "buy_count": buy_count,
         "watch_count": watch_count,
         "sell_count": sell_count,
+        "excluded_count": excluded_count,
         "no_trade_count": no_trade_count,
     }
     
