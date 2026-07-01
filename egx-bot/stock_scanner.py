@@ -231,13 +231,46 @@ def _set_cached_scan(data: list[StockAnalysis]) -> None:
     _scan_cache["data"] = data
 
 
+# ─── EGX 30 Index: 20-day change for Relative Strength filter ────────────────
+
+def get_egx30_change_20d() -> float | None:
+    """
+    Fetch EGX 30 index 20-day % change from TradingView.
+    Used as the benchmark for the Relative Strength filter (step 5).
+    Returns None if data is unavailable.
+    """
+    try:
+        from tvDatafeed import TvDatafeed, Interval
+        tv = _get_tv()
+        df = tv.get_hist(symbol="EGX30", exchange="EGX", interval=Interval.in_daily, n_bars=30)
+        if df is None or len(df) < 22:
+            return None
+        df = df.rename(columns={"close": "Close"})
+        price_now = float(df["Close"].iloc[-1])
+        price_20d = float(df["Close"].iloc[-21])
+        if price_20d <= 0:
+            return None
+        return round((price_now - price_20d) / price_20d * 100, 2)
+    except Exception as e:
+        logger.warning(f"Could not fetch EGX30 for RS filter: {e}")
+        return None
+
+
 # ─── Single Stock Scan ───────────────────────────────────────────────────────
 
 def scan_single_stock(ticker: str) -> StockAnalysis | None:
     """
     Scan a single stock by ticker — much faster than scan_all_stocks().
     Used by /stock SYMBOL command.
+    Applies the full v2 pipeline (gates → indicators → v2 score).
     """
+    from filters import (
+        pass_all_gates, volume_surge_check, confirmation_check,
+        trend_strength_filter, risk_filter, get_exclusion_code,
+    )
+    from scoring import compute_score_v2
+    import config
+
     ticker = normalize_symbol(ticker)
     if not is_valid_egx_symbol(ticker):
         logger.warning(f"Symbol {ticker} is not a verified EGX symbol.")
@@ -259,39 +292,118 @@ def scan_single_stock(ticker: str) -> StockAnalysis | None:
         logger.warning(f"No data for {ticker}.")
         return None
 
-    # Validate
+    # Validate OHLCV
     validation = validate_ohlcv(df, ticker)
     if not validation.is_valid:
         logger.warning(f"Data validation failed for {ticker}: {validation.issues[:2]}")
         return None
 
-    # Analyze
+    # Run full indicator analysis
     try:
         analysis = analyze_stock(df, ticker, name_en, name_ar)
         analysis.data_freshness = validation.freshness
         analysis.data_quality = validation.quality_score
         analysis.timestamp = datetime.now().isoformat()
-        analysis.scoring_result = compute_score(analysis, validation.freshness, validation.quality_score)
-        return analysis
     except Exception as e:
         logger.error(f"Analysis failed for {ticker}: {e}")
         return None
 
+    # v2 pipeline — gates + filters + scoring
+    egx30_20d = get_egx30_change_20d()
+
+    # Gates (liquidity + price limit)
+    passed_gates, gate_results = pass_all_gates(df, analysis.daily_change_pct, ticker)
+    if not passed_gates:
+        analysis.scoring_result = _make_excluded_result(get_exclusion_code(gate_results))
+        return analysis
+
+    # Volume surge + confirmation
+    confirmation = confirmation_check(df, ticker)
+    if not confirmation.confirmed:
+        analysis.scoring_result = _make_excluded_result(confirmation.exclusion_code or "لا يوجد تأكيد يومين")
+        return analysis
+
+    # Trend & Relative Strength
+    ema50_ind = next((i for i in analysis.indicators if i.name == "EMA 50"), None)
+    rsi_ind   = next((i for i in analysis.indicators if i.name == "RSI"), None)
+    ema50 = ema50_ind.value if ema50_ind else 0.0
+    rsi   = rsi_ind.value   if rsi_ind   else 50.0
+
+    trend = trend_strength_filter(df, ema50, rsi, egx30_20d, ticker)
+    if not trend.passed:
+        analysis.scoring_result = _make_excluded_result(trend.exclusion_code)
+        return analysis
+
+    # Risk management
+    atr_ind = next((i for i in analysis.indicators if i.name == "ATR"), None)
+    atr = atr_ind.value if atr_ind else 0.0
+    risk = risk_filter(analysis.current_price, atr, analysis.resistance, ticker)
+    if not risk.passed:
+        analysis.scoring_result = _make_excluded_result(risk.exclusion_code)
+        return analysis
+
+    # Compute v2 score
+    avg_turnover = df["Volume"].tail(20).mean() * analysis.current_price
+    latest_turnover = float(df["Volume"].iloc[-1]) * analysis.current_price
+    stock_20d_change = ((analysis.current_price - float(df["Close"].iloc[-21])) / float(df["Close"].iloc[-21]) * 100) if len(df) >= 21 else 0.0
+
+    scoring = compute_score_v2(
+        analysis,
+        avg_turnover_egp=avg_turnover,
+        latest_turnover_egp=latest_turnover,
+        stock_change_20d=stock_20d_change,
+        egx30_change_20d=egx30_20d if egx30_20d is not None else 0.0,
+        confirmation=confirmation,
+        rr_ratio=risk.details["rr_ratio"],
+        stop_loss=risk.details["stop_loss"],
+        target=risk.details["target"],
+        data_freshness=validation.freshness,
+        data_quality=validation.quality_score,
+    )
+    analysis.scoring_result = scoring
+    return analysis
+
+
+def _make_excluded_result(exclusion_code: str):
+    """Create a ScoringResult for an excluded stock (failed a filter)."""
+    from scoring import ScoringResult
+    return ScoringResult(
+        total_score=0,
+        recommendation="No Trade",
+        recommendation_ar="لا تداول ⚪",
+        exclusion_reason=exclusion_code,
+        exclusion_code=exclusion_code,
+    )
 
 
 # ─── Full Scan ───────────────────────────────────────────────────────────────
 
 def scan_all_stocks() -> list[StockAnalysis]:
     """
-    Full pipeline:
+    Full Liquidity-First v2 pipeline:
     1. Check cache (return if fresh)
     2. Collect stock list (scrape + validate)
-    3. Download historical data per stock (with retries)
-    4. Validate OHLCV data
-    5. Compute technical indicators
-    6. Score each stock (0-100 deterministic)
-    7. Cache and return sorted by composite score
+    3. Download EGX 30 index for Relative Strength benchmark
+    4. Per stock:
+       a. Download historical OHLCV (TradingView, with retries)
+       b. Price deviation check (>4% → Needs Verification)
+       c. OHLCV validation
+       d. Liquidity gate + Price limit gate (pre-indicator)
+       e. Technical indicators (15+)
+       f. Volume surge + 2-day confirmation
+       g. Trend & Relative Strength filter
+       h. Risk management filter (ATR stop-loss, R/R >= 2:1)
+       i. Liquidity-First v2 scoring (4 factors, 0-100)
+    5. Sort by score (scored stocks first, excluded after)
+    6. Cache and return
     """
+    from filters import (
+        pass_all_gates, volume_surge_check, confirmation_check,
+        trend_strength_filter, risk_filter, get_exclusion_code,
+    )
+    from scoring import compute_score_v2
+    import config
+
     # Check cache first
     cached = _get_cached_scan()
     if cached is not None:
@@ -303,20 +415,28 @@ def scan_all_stocks() -> list[StockAnalysis]:
         return []
 
     total = len(stock_list)
-    logger.info(f"Starting scan of {total} EGX stocks...")
+    logger.info(f"Starting v2 scan of {total} EGX stocks...")
+
+    # Fetch EGX 30 benchmark once (used for relative strength filter)
+    egx30_20d = get_egx30_change_20d()
+    if egx30_20d is not None:
+        logger.info(f"EGX 30: 20-day change = {egx30_20d:+.2f}%")
+    else:
+        logger.warning("EGX 30 data unavailable — RS filter will be skipped")
 
     results: list[StockAnalysis] = []
     success_count = 0
     fail_count = 0
     rejected_count = 0
+    gate_excluded = 0
+    filter_excluded = 0
 
     for i, stock_info in enumerate(stock_list, 1):
-        ticker = stock_info["symbol"]
-        name_en = stock_info["name"]
+        ticker   = stock_info["symbol"]
+        name_en  = stock_info["name"]
         live_price = stock_info["price"]
         live_change = stock_info["change_pct"]
 
-        # Validate symbol
         if not is_valid_egx_symbol(ticker):
             logger.debug(f"  ❌ {ticker}: not a verified EGX symbol, skipping")
             rejected_count += 1
@@ -325,96 +445,171 @@ def scan_all_stocks() -> list[StockAnalysis]:
         name_ar = get_arabic_name(ticker, name_en)
 
         if i % 20 == 0:
-            logger.info(f"Progress: {i}/{total} ({success_count} ok, {fail_count} failed, {rejected_count} rejected)")
+            logger.info(
+                f"Progress: {i}/{total} | scored={success_count} "
+                f"failed={fail_count} rejected={rejected_count} "
+                f"gate_excluded={gate_excluded} filter_excluded={filter_excluded}"
+            )
 
-        # Download historical data
+        # ── Step 4a: Download historical OHLCV ──
         df = download_stock_history(ticker, n_bars=250, retries=2)
 
-        # ── Price deviation check: compare scraped price with last close ──
-        # >4% deviation → "Needs Verification" (not rejected, but excluded from scoring)
-        # Zero/null/NaN → rejected entirely
+        # ── Step 4b: Price deviation check ──
         if df is not None and len(df) > 0 and live_price > 0:
             last_close = float(df["Close"].iloc[-1])
             price_result = validate_scraped_price(live_price, last_known_price=last_close, ticker=ticker)
             if not price_result.is_valid:
-                # Rejected entirely (zero/null/NaN)
                 logger.warning(f"  ⚠️ {ticker}: {price_result.reason}")
                 rejected_count += 1
                 continue
             elif price_result.is_suspicious:
-                # Needs Verification — price deviates >4% from last close
-                logger.warning(f"  🔍 {ticker}: {price_result.reason}")
+                logger.warning(f"  🔍 {ticker}: {price_result.reason} — Needs Verification")
                 last_scan_status.needs_verification.append(ticker)
-                # Don't compute score, but keep in results for display without recommendation
-                # Will be filtered out from final recommendations
                 continue
 
-        # Validate OHLCV data
-        freshness = "unknown"
-        data_quality = 0.5
-
-        if df is not None and len(df) >= 50:
-            validation = validate_ohlcv(df, ticker)
-            freshness = validation.freshness
-            data_quality = validation.quality_score
-
-            if not validation.is_valid:
-                logger.debug(f"  ⚠️ {ticker}: data validation failed — {validation.issues[0] if validation.issues else 'unknown'}")
-                fail_count += 1
-                last_scan_status.no_indicators_tickers.append(ticker)
-                continue
-        elif df is None or len(df) < 50:
+        # ── Step 4c: OHLCV validation ──
+        if df is None or len(df) < 50:
             fail_count += 1
-            # Exclude entirely from results — no indicators = no recommendation
             last_scan_status.no_indicators_tickers.append(ticker)
-            logger.debug(f"  ⚠️ {ticker}: no indicators (tvDatafeed returned {len(df) if df is not None else 0} bars)")
+            logger.debug(f"  ⚠️ {ticker}: no history ({len(df) if df is not None else 0} bars)")
             continue
 
-        # Compute indicators
+        validation = validate_ohlcv(df, ticker)
+        if not validation.is_valid:
+            logger.debug(f"  ⚠️ {ticker}: OHLCV validation failed — {validation.issues[0] if validation.issues else 'unknown'}")
+            fail_count += 1
+            last_scan_status.no_indicators_tickers.append(ticker)
+            continue
+
+        freshness = validation.freshness
+        data_quality = validation.quality_score
+
+        # ── Step 4d: Liquidity gate + Price limit gate (BEFORE indicators) ──
+        passed_gates, gate_results = pass_all_gates(df, live_change, ticker)
+        if not passed_gates:
+            excl_code = get_exclusion_code(gate_results)
+            logger.info(f"  🚫 {ticker}: gate excluded — {excl_code}")
+            gate_excluded += 1
+            last_scan_status.total_rejected += 1
+            # Track in scan results as excluded (for analytics/RecommendationHistory)
+            _record_excluded(ticker, live_price, excl_code)
+            continue
+
+        # ── Step 4e: Technical indicators ──
         try:
             analysis = analyze_stock(df, ticker, name_en, name_ar)
-
-            # Override with live price from stockanalysis.com
             if live_price > 0:
                 analysis.current_price = live_price
                 analysis.daily_change_pct = live_change
-
-            # Attach data quality metadata
             analysis.data_freshness = freshness
             analysis.data_quality = data_quality
             analysis.timestamp = datetime.now().isoformat()
-
-            # Compute deterministic score
-            scoring = compute_score(analysis, freshness, data_quality)
-            analysis.scoring_result = scoring  # type: ignore[attr-defined]
-
-            results.append(analysis)
-            success_count += 1
-
         except Exception as e:
-            logger.warning(f"  ❌ {ticker}: analysis failed: {str(e)[:80]}")
+            logger.warning(f"  ❌ {ticker}: indicator analysis failed: {str(e)[:80]}")
             fail_count += 1
             last_scan_status.no_indicators_tickers.append(ticker)
+            continue
+
+        # ── Step 4f: Volume surge + 2-day confirmation ──
+        confirmation = confirmation_check(df, ticker)
+        if not confirmation.confirmed:
+            excl_code = confirmation.exclusion_code or "لا يوجد تأكيد يومين"
+            logger.info(f"  🚫 {ticker}: confirmation failed — {excl_code}")
+            filter_excluded += 1
+            analysis.scoring_result = _make_excluded_result(excl_code)
+            results.append(analysis)  # keep in results for display, just excluded from recommendations
+            continue
+
+        # ── Step 4g: Trend & Relative Strength ──
+        ema50_ind = next((ind for ind in analysis.indicators if ind.name == "EMA 50"), None)
+        rsi_ind   = next((ind for ind in analysis.indicators if ind.name == "RSI"), None)
+        ema50 = ema50_ind.value if ema50_ind else 0.0
+        rsi   = rsi_ind.value   if rsi_ind   else 50.0
+
+        trend = trend_strength_filter(df, ema50, rsi, egx30_20d, ticker)
+        if not trend.passed:
+            logger.info(f"  🚫 {ticker}: trend/RS failed — {trend.exclusion_code}")
+            filter_excluded += 1
+            analysis.scoring_result = _make_excluded_result(trend.exclusion_code)
+            results.append(analysis)
+            continue
+
+        # ── Step 4h: Risk management filter ──
+        atr_ind = next((ind for ind in analysis.indicators if ind.name == "ATR"), None)
+        atr = atr_ind.value if atr_ind else 0.0
+        risk = risk_filter(analysis.current_price, atr, analysis.resistance, ticker)
+        if not risk.passed:
+            logger.info(f"  🚫 {ticker}: risk/reward failed — {risk.exclusion_code}")
+            filter_excluded += 1
+            analysis.scoring_result = _make_excluded_result(risk.exclusion_code)
+            results.append(analysis)
+            continue
+
+        # ── Step 4i: Liquidity-First v2 score ──
+        avg_turnover    = float(df["Volume"].tail(20).replace(0, float("nan")).mean() * analysis.current_price)
+        latest_turnover = float(df["Volume"].iloc[-1]) * analysis.current_price
+
+        stock_20d_change = 0.0
+        if len(df) >= 21:
+            price_20d = float(df["Close"].iloc[-21])
+            if price_20d > 0:
+                stock_20d_change = (analysis.current_price - price_20d) / price_20d * 100
+
+        scoring = compute_score_v2(
+            analysis,
+            avg_turnover_egp=avg_turnover,
+            latest_turnover_egp=latest_turnover,
+            stock_change_20d=stock_20d_change,
+            egx30_change_20d=egx30_20d if egx30_20d is not None else 0.0,
+            confirmation=confirmation,
+            rr_ratio=risk.details["rr_ratio"],
+            stop_loss=risk.details["stop_loss"],
+            target=risk.details["target"],
+            data_freshness=freshness,
+            data_quality=data_quality,
+        )
+        analysis.scoring_result = scoring
+
+        results.append(analysis)
+        success_count += 1
 
         time.sleep(0.15)
 
-    results.sort(key=lambda x: x.composite_score, reverse=True)
+    # Sort: scored stocks (recommendation != No Trade/Excluded) first, by score desc
+    def sort_key(s):
+        sr = s.scoring_result
+        if sr is None:
+            return (2, 0)
+        if sr.recommendation in ("Buy", "Watch"):
+            return (0, -sr.total_score)
+        if sr.recommendation == "Sell":
+            return (1, -sr.total_score)
+        return (2, 0)
+
+    results.sort(key=sort_key)
     _set_cached_scan(results)
 
     # Update scan status
     last_scan_status.total_scraped = total
     last_scan_status.total_validated = success_count
-    last_scan_status.coverage_count = success_count
+    last_scan_status.coverage_count = success_count + filter_excluded
     last_scan_status.has_reliable_data = success_count > 0
     last_scan_status.source = "stockanalysis.com" if not last_scan_status.used_fallback else "egx_stocks.json (fallback)"
-    logger.info(f"Scan complete: {success_count} analyzed, {fail_count} failed, {rejected_count} rejected, {total} total")
-    logger.info(f"Scan status: {last_scan_status.summary()}")
 
-    if success_count == 0:
-        logger.error(f"No stocks passed validation. Failed sources: {last_scan_status.failed_sources}")
+    logger.info(
+        f"v2 Scan complete: {success_count} scored, {filter_excluded} filter-excluded, "
+        f"{gate_excluded} gate-excluded, {fail_count} failed, {rejected_count} symbol-rejected"
+    )
 
     return results
 
+
+def _record_excluded(ticker: str, price: float, exclusion_code: str) -> None:
+    """
+    Log gate-excluded stocks for potential RecommendationHistory tracking.
+    Gate-excluded stocks didn't get indicators computed, so we just log them.
+    """
+    logger.info(f"  📋 {ticker} gate-excluded (price={price:.2f}, reason={exclusion_code})")
 
 
 # ─── Last Report Cache (fallback when today's scan fails) ────────────────────
