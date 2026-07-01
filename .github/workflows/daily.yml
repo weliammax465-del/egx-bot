@@ -110,7 +110,6 @@ jobs:
         continue-on-error: true
 
       # ── Telegram Failure Notification ─────────────────────────────
-      # Replaces the old SMTP email notification (which was never configured).
       # Sends a direct Telegram message if ALL retry attempts failed.
       - name: Notify on Telegram failure
         if: failure() && steps.check-sent.outputs.cache-hit != 'true'
@@ -118,21 +117,6 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          MSG="❌ EGX Bot — فشل التقرير اليومي بعد 3 محاولات
-
-التاريخ: ${{ steps.date.outputs.today }}
-التفاصيل: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-تحقق من:
-• صلاحية Telegram Bot Token
-• صلاحية Gemini API Key
-• مصادر البيانات (TradingView/stockanalysis.com)
-
-نظام المراقبة Base44 ستحاول إعادة التشغيل تلقائياً خلال 15 دقيقة."
-
-          curl -s -X POST \
-            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-            -d "chat_id=${TELEGRAM_CHAT_ID}" \
-            --data-urlencode "text=${MSG}" \
-            > /dev/null 2>&1 || true
+          MSG='❌ EGX Bot — فشل التقرير اليومي بعد 3 محاولات | التاريخ: ${{ steps.date.outputs.today }} | التفاصيل: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }} | تحقق من: Telegram Bot Token, Gemini API Key, مصادر البيانات | نظام المراقبة ستحاول إعادة التشغيل تلقائياً خلال 15 دقيقة.'
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" -d "chat_id=${TELEGRAM_CHAT_ID}" --data-urlencode "text=${MSG}" > /dev/null 2>&1 || true
         continue-on-error: true
