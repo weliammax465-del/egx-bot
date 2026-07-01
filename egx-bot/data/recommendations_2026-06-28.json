@@ -7,7 +7,10 @@
       "score": 75,
       "price": 150.0,
       "type": "Buy",
-      "risk_level": "Medium"
+      "risk_level": "Medium",
+      "stop_loss": 0.0,
+      "target": 0.0,
+      "rr_ratio": 0.0
     },
     {
       "ticker": "SWDY",
@@ -15,7 +18,10 @@
       "score": 55,
       "price": 80.0,
       "type": "Watch",
-      "risk_level": "Low"
+      "risk_level": "Low",
+      "stop_loss": 0.0,
+      "target": 0.0,
+      "rr_ratio": 0.0
     }
   ],
   "current_prices": {
@@ -28,5 +34,6 @@
   "buy_count": 1,
   "watch_count": 1,
   "sell_count": 0,
+  "excluded_count": 0,
   "no_trade_count": 1
 }
