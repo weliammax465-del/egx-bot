@@ -179,14 +179,29 @@ def _get_tv():
     return _tv_instance
 
 
-def download_stock_history(ticker: str, n_bars: int = 250, retries: int = 2) -> Optional[pd.DataFrame]:
-    """Download historical OHLCV from TradingView with retry logic."""
+def download_stock_history(ticker: str, n_bars: int = 250, retries: int = 2, timeout: int = 20) -> Optional[pd.DataFrame]:
+    """Download historical OHLCV from TradingView with retry logic and per-request timeout."""
     from tvDatafeed import TvDatafeed, Interval
+    import concurrent.futures
     tv = _get_tv()
+
+    def _do_download():
+        return tv.get_hist(symbol=ticker, exchange="EGX", interval=Interval.in_daily, n_bars=n_bars)
 
     for attempt in range(retries + 1):
         try:
-            df = tv.get_hist(symbol=ticker, exchange="EGX", interval=Interval.in_daily, n_bars=n_bars)
+            # Use thread with timeout to prevent tvDatafeed hangs
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(_do_download)
+                try:
+                    df = future.result(timeout=timeout)
+                except concurrent.futures.TimeoutError:
+                    logger.warning(f"TradingView timeout for {ticker} ({timeout}s, attempt {attempt+1})")
+                    if attempt < retries:
+                        time.sleep(2 * (attempt + 1))
+                        continue
+                    return None
+
             if df is not None and len(df) > 0:
                 df = df.rename(columns={
                     "open": "Open", "high": "High", "low": "Low",
@@ -205,8 +220,6 @@ def download_stock_history(ticker: str, n_bars: int = 250, retries: int = 2) -> 
                 time.sleep(2 * (attempt + 1))
             else:
                 logger.warning(f"TradingView failed for {ticker} after {retries+1} attempts — error type: {error_type} | {str(e)[:80]}")
-                if error_type == "insufficient_data" or (df is not None and len(df) < 50):
-                    logger.info(f"  {ticker}: insufficient historical data ({len(df) if df is not None else 0} bars, need 50)")
                 return None
     return None
 

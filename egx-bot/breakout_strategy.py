@@ -730,24 +730,69 @@ def evaluate_pre_breakout(df: pd.DataFrame, ticker: str) -> PreBreakoutSignal:
     return result
 
 
-def scan_pre_breakout(stock_list, download_func, progress_callback=None):
-    """Scan all stocks for pre-breakout setups."""
+def scan_pre_breakout(stock_list, download_func, progress_callback=None, max_workers=8, per_stock_timeout=30):
+    """
+    Scan all stocks for pre-breakout setups using parallel downloads.
+    Each stock download has a per_stock_timeout to prevent hangs.
+    Uses ThreadPoolExecutor for concurrent downloads.
+    """
+    import concurrent.futures
+    import time as _time
+
     results = []
     total = len(stock_list)
-    for i, stock_info in enumerate(stock_list, 1):
+    scanned = 0
+    errors = 0
+    start_time = _time.time()
+
+    def _scan_one(stock_info):
+        """Scan a single stock — returns PreBreakoutSignal or None."""
         ticker = stock_info["symbol"]
-        if progress_callback and i % 20 == 0:
-            progress_callback(i, total, len(results))
         try:
-            df = download_func(ticker, n_bars=250, retries=2)
+            df = download_func(ticker, n_bars=150, retries=1)
             if df is None or df.empty:
-                continue
+                return None
             signal = evaluate_pre_breakout(df, ticker)
-            # Only keep stocks with a setup (skip NO_SETUP and ALREADY_BREAKOUT)
             if signal.signal in ("APPROACHING", "ACCUMULATING"):
-                results.append(signal)
+                return signal
+            return None
         except Exception as e:
             logger.debug(f"  {ticker}: {str(e)[:60]}")
+            return None
+
+    # Use ThreadPoolExecutor for parallel downloads
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # Submit all tasks
+        future_to_stock = {
+            executor.submit(_scan_one, stock_info): stock_info["symbol"]
+            for stock_info in stock_list
+        }
+
+        # Collect results as they complete, with per-future timeout
+        for future in concurrent.futures.as_completed(future_to_stock, timeout=per_stock_timeout * len(stock_list) // max_workers + 60):
+            scanned += 1
+            ticker = future_to_stock[future]
+            try:
+                result = future.result(timeout=per_stock_timeout)
+                if result is not None:
+                    results.append(result)
+            except concurrent.futures.TimeoutError:
+                logger.warning(f"  ⏰ {ticker}: timed out after {per_stock_timeout}s")
+                errors += 1
+            except Exception as e:
+                logger.debug(f"  {ticker}: {str(e)[:60]}")
+                errors += 1
+
+            # Progress logging
+            if progress_callback and scanned % 20 == 0:
+                progress_callback(scanned, total, len(results))
+            elif scanned % 50 == 0:
+                elapsed = _time.time() - start_time
+                logger.info(f"  Pre-breakout scan: {scanned}/{total} scanned, {len(results)} setups, {errors} errors, {elapsed:.0f}s elapsed")
+
+    elapsed = _time.time() - start_time
+    logger.info(f"  Pre-breakout scan complete: {scanned}/{total} scanned, {len(results)} setups found, {errors} errors, {elapsed:.0f}s total")
+
     # Sort by score descending
     results.sort(key=lambda x: x.score, reverse=True)
     return results
