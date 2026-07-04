@@ -1,31 +1,26 @@
 """
 EMA50 Breakout Strategy — Pine Script translation for EGX Bot
 ===============================================================
-Replaces the Liquidity-First v2 scoring engine with a clean
-signal-based breakout strategy matching the user's Pine Script.
-
 Strategy flow:
-1. Stock trades below EMA50 for N candles (precondition / setup)
+1. Stock trades below EMA50 for N candles (precondition)
 2. Breakout candle: close crosses above EMA50 -> record breakout_high
 3. waiting_confirmation = True
-4. On subsequent candles, check ALL conditions:
+4. Check ALL 8 conditions on latest candle:
    - cond1: candles_below_count >= 2 (was below EMA before breakout)
    - cond2: close > EMA50 (price above EMA)
    - cond3: close > breakout_high (broke above breakout candle's high)
-   - cond4: RSI > rsi_threshold (momentum confirmation)
-   - cond5: +DI > -DI (bullish directional movement)
-   - cond6: ADX > adx_threshold (trend strength)
+   - cond4: RSI > threshold (momentum)
+   - cond5: +DI > -DI (bullish direction)
+   - cond6: ADX > threshold (trend strength)
    - cond7: volume > volume_avg (volume confirmation)
    - cond8: price hasn't returned below EMA (breakout held)
-5. ALL conditions met -> BUY signal
-6. Price falls below EMA while waiting -> cancel signal
+5. ALL met -> BUY signal; price falls below EMA -> cancel
 """
 
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
-from datetime import datetime
+from dataclasses import dataclass
 from typing import Optional
 
 import numpy as np
@@ -39,30 +34,26 @@ EMA_PERIOD = 50
 RSI_THRESHOLD = 50.0
 ADX_THRESHOLD = 20.0
 VOLUME_AVG_PERIOD = 20
-MIN_CANDLES_BELOW = 2      # cond1: at least 2 candles below EMA before breakout
-MIN_BARS_REQUIRED = 60     # minimum data points needed (EMA50 + buffer)
+MIN_CANDLES_BELOW = 2
+MIN_BARS_REQUIRED = 60
+EMA_TOLERANCE = 0.005  # 0.5% tolerance for "below EMA" check (avoids noise)
 
 
-# ─── Data Classes ────────────────────────────────────────────────────────────
+# ─── Data Class ──────────────────────────────────────────────────────────────
 
 @dataclass
 class BreakoutSignal:
-    """Result of the breakout strategy for a single stock."""
     ticker: str
-    signal: str = "NO_SIGNAL"          # "BUY" | "WAIT" | "NO_SIGNAL"
+    signal: str = "NO_SIGNAL"
     signal_ar: str = "لا توجد إشارة"
-
-    # All 8 conditions
-    cond1: bool = False                 # candles below EMA before breakout
-    cond2: bool = False                 # price above EMA
-    cond3: bool = False                 # close > breakout_high
-    cond4: bool = False                 # RSI > threshold
-    cond5: bool = False                 # +DI > -DI
-    cond6: bool = False                 # ADX > threshold
-    cond7: bool = False                 # volume > average
-    cond8: bool = False                 # hasn't returned below EMA
-
-    # Details for display
+    cond1: bool = False
+    cond2: bool = False
+    cond3: bool = False
+    cond4: bool = False
+    cond5: bool = False
+    cond6: bool = False
+    cond7: bool = False
+    cond8: bool = False
     ema_value: float = 0.0
     close: float = 0.0
     breakout_high: float = 0.0
@@ -75,13 +66,9 @@ class BreakoutSignal:
     volume: float = 0.0
     volume_avg: float = 0.0
     waiting_confirmation: bool = False
-
-    # Risk management (computed from ATR)
     stop_loss: float = 0.0
     target: float = 0.0
     atr: float = 0.0
-
-    # Metadata
     data_date: str = ""
     error: str = ""
 
@@ -96,20 +83,14 @@ class BreakoutSignal:
 
     def to_dict(self) -> dict:
         return {
-            "ticker": self.ticker,
-            "signal": self.signal,
+            "ticker": self.ticker, "signal": self.signal,
             "conditions_met": self.conditions_met,
-            "ema": round(self.ema_value, 2),
-            "close": round(self.close, 2),
+            "ema": round(self.ema_value, 2), "close": round(self.close, 2),
             "breakout_high": round(self.breakout_high, 2),
-            "rsi": round(self.rsi, 1),
-            "adx": round(self.adx, 1),
-            "di_plus": round(self.di_plus, 1),
-            "di_minus": round(self.di_minus, 1),
-            "volume": int(self.volume),
-            "volume_avg": int(self.volume_avg),
-            "stop_loss": round(self.stop_loss, 2),
-            "target": round(self.target, 2),
+            "rsi": round(self.rsi, 1), "adx": round(self.adx, 1),
+            "di_plus": round(self.di_plus, 1), "di_minus": round(self.di_minus, 1),
+            "volume": int(self.volume), "volume_avg": int(self.volume_avg),
+            "stop_loss": round(self.stop_loss, 2), "target": round(self.target, 2),
         }
 
 
@@ -117,7 +98,6 @@ class BreakoutSignal:
 
 def _ema(series: pd.Series, period: int) -> pd.Series:
     return series.ewm(span=period, adjust=False).mean()
-
 
 def _rsi(close: pd.Series, period: int = 14) -> pd.Series:
     delta = close.diff()
@@ -129,28 +109,21 @@ def _rsi(close: pd.Series, period: int = 14) -> pd.Series:
     rsi = 100 - (100 / (1 + rs))
     return rsi.fillna(50)
 
-
 def _adx(high: pd.Series, low: pd.Series, close: pd.Series, period: int = 14) -> tuple:
     tr1 = high - low
     tr2 = (high - close.shift(1)).abs()
     tr3 = (low - close.shift(1)).abs()
     tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-
     up_move = high - high.shift(1)
     down_move = low.shift(1) - low
-
     plus_dm = up_move.where((up_move > down_move) & (up_move > 0), 0.0)
     minus_dm = down_move.where((down_move > up_move) & (down_move > 0), 0.0)
-
     atr = tr.ewm(alpha=1/period, adjust=False).mean()
     plus_di = 100 * (plus_dm.ewm(alpha=1/period, adjust=False).mean() / atr.replace(0, np.nan))
     minus_di = 100 * (minus_dm.ewm(alpha=1/period, adjust=False).mean() / atr.replace(0, np.nan))
-
     dx = 100 * ((plus_di - minus_di).abs() / (plus_di + minus_di).replace(0, np.nan))
     adx_val = dx.ewm(alpha=1/period, adjust=False).mean()
-
     return adx_val.fillna(0), plus_di.fillna(0), minus_di.fillna(0)
-
 
 def _atr(high: pd.Series, low: pd.Series, close: pd.Series, period: int = 14) -> pd.Series:
     tr1 = high - low
@@ -189,7 +162,6 @@ def evaluate_breakout(df: pd.DataFrame, ticker: str) -> BreakoutSignal:
         result.error = f"Insufficient valid data after dropna: {len(df)}"
         return result
 
-    # ── Compute Indicators ────────────────────────────────────────────────────
     close = df['Close']
     high = df['High']
     low = df['Low']
@@ -201,48 +173,60 @@ def evaluate_breakout(df: pd.DataFrame, ticker: str) -> BreakoutSignal:
     atr_s = _atr(high, low, close, 14)
     vol_avg = volume.rolling(VOLUME_AVG_PERIOD).mean()
 
-    # ── Track Breakout State (walk through candles) ───────────────────────────
+    # ── State Machine (skip warmup: first EMA_PERIOD bars) ────────────────────
+    # Key fixes vs v1:
+    # 1. Skip first EMA_PERIOD bars so EMA is stabilized
+    # 2. Tolerance for "below EMA" check (0.1%) to avoid noise canceling breakouts
+    # 3. Don't overwrite pre_breakout_count on false returns; keep the LATEST breakout
+    # 4. Only update pre_breakout_count when a NEW breakout fires
+
     candles_below_count = 0
     breakout_high = 0.0
     breakout_date = ""
     breakout_idx = -1
     waiting = False
     returned_below = False
+    pre_breakout_count = 0
     highest_since_breakout = 0.0
-    pre_breakout_count = 0  # candles below EMA before the breakout
+
+    start_bar = EMA_PERIOD  # skip warmup
 
     for i in range(len(df)):
+        if i < start_bar:
+            continue
         if pd.isna(ema.iloc[i]):
             continue
 
         c = float(close.iloc[i])
         h = float(high.iloc[i])
         e = float(ema.iloc[i])
+        tolerance = e * EMA_TOLERANCE
 
-        if c < e:
-            # Below EMA
+        if c < e - tolerance:
+            # Below EMA (with tolerance)
             if not waiting:
                 candles_below_count += 1
             else:
-                # Price returned below EMA while waiting -> cancel
+                # Returned below EMA while waiting -> cancel
                 returned_below = True
                 waiting = False
-                pre_breakout_count = candles_below_count  # save for cond1
-                candles_below_count = 1  # reset
-        elif c > e:
-            # Above EMA
+                candles_below_count = 1  # start counting new below-period
+        elif c > e + tolerance:
+            # Above EMA (with tolerance)
             if not waiting and candles_below_count >= MIN_CANDLES_BELOW:
-                # Breakout candle!
+                # NEW breakout!
                 breakout_high = h
                 breakout_date = str(df.index[i])[:10] if not isinstance(df.index[i], (int, float)) else str(i)
                 breakout_idx = i
                 pre_breakout_count = candles_below_count
                 waiting = True
+                returned_below = False  # reset for new breakout cycle
                 highest_since_breakout = h
                 candles_below_count = 0
             elif waiting:
                 if h > highest_since_breakout:
                     highest_since_breakout = h
+        # else: within tolerance, treat as "at EMA" — don't change state
 
     # ── Evaluate Conditions (latest candle) ───────────────────────────────────
     last_close = float(close.iloc[-1])
@@ -254,10 +238,8 @@ def evaluate_breakout(df: pd.DataFrame, ticker: str) -> BreakoutSignal:
     last_vol = float(volume.iloc[-1])
     last_vol_avg = float(vol_avg.iloc[-1]) if not pd.isna(vol_avg.iloc[-1]) else 0.0
     last_atr = float(atr_s.iloc[-1]) if not pd.isna(atr_s.iloc[-1]) else 0.0
-
     data_date = str(df.index[-1])[:10] if not isinstance(df.index[-1], (int, float)) else ""
 
-    # Fill result
     result.close = last_close
     result.ema_value = last_ema
     result.rsi = last_rsi
@@ -274,28 +256,13 @@ def evaluate_breakout(df: pd.DataFrame, ticker: str) -> BreakoutSignal:
     result.candles_below_count = pre_breakout_count if breakout_idx >= 0 else candles_below_count
 
     # ── 8 Conditions ──────────────────────────────────────────────────────────
-    # cond1: At least MIN_CANDLES_BELOW candles were below EMA before breakout
     result.cond1 = (pre_breakout_count >= MIN_CANDLES_BELOW) if breakout_idx >= 0 else (candles_below_count >= MIN_CANDLES_BELOW)
-
-    # cond2: Price is above EMA
     result.cond2 = last_close > last_ema
-
-    # cond3: Close > breakout_high
     result.cond3 = waiting and (last_close > breakout_high) if breakout_high > 0 else False
-
-    # cond4: RSI > threshold
     result.cond4 = last_rsi > RSI_THRESHOLD
-
-    # cond5: +DI > -DI
     result.cond5 = last_di_plus > last_di_minus
-
-    # cond6: ADX > threshold
     result.cond6 = last_adx > ADX_THRESHOLD
-
-    # cond7: Volume > average
     result.cond7 = last_vol > last_vol_avg if last_vol_avg > 0 else False
-
-    # cond8: Price hasn't returned below EMA
     result.cond8 = waiting and not returned_below
 
     # ── Final Signal ──────────────────────────────────────────────────────────
@@ -305,7 +272,6 @@ def evaluate_breakout(df: pd.DataFrame, ticker: str) -> BreakoutSignal:
     if all_met:
         result.signal = "BUY"
         result.signal_ar = "🟢 شراء"
-        # Risk management: ATR-based
         if last_atr > 0:
             result.stop_loss = last_close - (1.5 * last_atr)
             risk = last_close - result.stop_loss
@@ -327,7 +293,6 @@ def scan_stocks_breakout(stock_list, download_func, progress_callback=None):
     """Scan all stocks using the EMA50 breakout strategy."""
     results = []
     total = len(stock_list)
-
     for i, stock_info in enumerate(stock_list, 1):
         ticker = stock_info["symbol"]
         if progress_callback and i % 20 == 0:
@@ -343,11 +308,10 @@ def scan_stocks_breakout(stock_list, download_func, progress_callback=None):
             results.append(signal)
         except Exception as e:
             logger.warning(f"  {ticker}: error — {str(e)[:80]}")
-
     return results
 
 
-# ─── Formatting for Telegram ─────────────────────────────────────────────────
+# ─── Formatting ──────────────────────────────────────────────────────────────
 
 def format_breakout_summary(signals):
     """Format breakout results for Telegram message."""
@@ -384,7 +348,7 @@ def format_breakout_summary(signals):
     if wait_signals:
         lines.append("⏸ *في انتظار التأكيد:*")
         lines.append("")
-        for s in wait_signals[:10]:
+        for s in sorted(wait_signals, key=lambda x: x.conditions_met, reverse=True)[:10]:
             met = s.conditions_met
             lines.append(f"   • {s.ticker} — {s.close:.2f} | {met}/8 شروط | اختراق: {s.breakout_high:.2f}")
         if len(wait_signals) > 10:
@@ -397,7 +361,6 @@ def format_breakout_summary(signals):
         f"⚙️ EMA={EMA_PERIOD} | RSI>{RSI_THRESHOLD} | ADX>{ADX_THRESHOLD}",
         "⚠️ هذه ليست نصيحة استثمارية",
     ]
-
     return "\n".join(lines)
 
 
@@ -411,7 +374,6 @@ def format_stock_breakout_detail(signal):
         f"📅 البيانات: {signal.data_date}",
         "",
     ]
-
     if signal.error:
         lines.append(f"❌ خطأ: {signal.error}")
         return "\n".join(lines)
@@ -444,7 +406,6 @@ def format_stock_breakout_detail(signal):
     ]
     for label, met, value in conditions:
         lines.append(f"   {'✅' if met else '❌'} {label}: {value}")
-
     lines.append("")
 
     if signal.stop_loss > 0:
@@ -458,5 +419,4 @@ def format_stock_breakout_detail(signal):
         f"⚙️ EMA{EMA_PERIOD} | RSI>{RSI_THRESHOLD} | ADX>{ADX_THRESHOLD}",
         "⚠️ للمعلومات فقط — ليست نصيحة استثمارية",
     ]
-
     return "\n".join(lines)
