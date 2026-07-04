@@ -40,12 +40,16 @@ from fetch_egx import build_market_summary, format_summary_text
 from stock_scanner import (
     scan_all_stocks, format_analysis_for_ai,
     get_buy_signals, get_watchlist,
-    scan_single_stock,
+    scan_single_stock, scrape_egx_stock_list, download_stock_history,
     get_scan_status, load_last_report, save_last_report,
 )
 from ai_report import (
     explain_analysis, build_telegram_message, build_stocks_table_message,
     format_stock_detail, _escape_markdown, _safe_truncate,
+)
+from breakout_strategy import (
+    evaluate_breakout, scan_stocks_breakout,
+    format_breakout_summary, format_stock_breakout_detail,
 )
 
 logging.basicConfig(
@@ -150,53 +154,46 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cmd_today(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Full daily report: market overview + AI explanation + scored stocks."""
+    """Daily report: market overview + EMA50 breakout strategy scan."""
     if not _check_cooldown(update.effective_chat.id):
         await update.message.reply_text("⏳ يرجى الانتظار 30 ثانية بين الأوامر.")
         return
     msg = await update.message.reply_text(
-        "⏳ جاري تحليل جميع أسهم البورصة المصرية…\n"
-        "📊 حساب 15+ مؤشر تقني + درجة من 100 لكل سهم"
+        "⏳ جاري تحليل أسهم البورصة المصرية…\n"
+        "📊 استراتيجية اختراق EMA50 | 8 شروط للتأكيد"
     )
 
     try:
         market_summary = build_market_summary()
-        stocks = scan_all_stocks()
-
-        if not stocks:
-            status = get_scan_status()
-            failed = ", ".join(status.failed_sources) if status.failed_sources else "غير محدد"
-            await msg.edit_text(
-                f"❌ لا توجد بيانات موثوقة كافية اليوم.\n"
-                f"🔍 المصدر الفاشل: {failed}\n"
-                f"⏳ سيتم إعادة المحاولة تلقائيًا."
-            )
+        stock_list = scrape_egx_stock_list()
+        
+        if not stock_list:
+            await msg.edit_text("❌ تعذر جلب قائمة الأسهم. تحقق من المصدر.")
             return
-
-        market_text = format_summary_text(market_summary) if market_summary else ""
-        computed_data = format_analysis_for_ai(stocks, market_text)
-        ai_summary = explain_analysis(computed_data)
-
-        main_msg = build_telegram_message(ai_summary, stocks, market_summary)
-        # Add limited coverage warning if applicable
-        status = get_scan_status()
-        if status.limited_coverage:
-            warning = f"\n⚠️ تغطية محدودة اليوم: {status.coverage_count} سهم فقط بسبب تعذر الوصول للمصدر الرئيسي\n\n"
-            main_msg = warning + main_msg
+        
+        signals = scan_stocks_breakout(stock_list, download_stock_history)
+        
+        if not signals:
+            await msg.edit_text("❌ لا توجد بيانات كافية اليوم.")
+            return
+        
+        market_str = ""
+        if market_summary and hasattr(market_summary, 'current_value'):
+            arrow = "📈" if market_summary.direction == "up" else ("📉" if market_summary.direction == "down" else "➡️")
+            market_str = f"🇪🇬 EGX 30: {market_summary.current_value:,} {arrow} ({market_summary.change_pct}%)" + "\n\n"
+        
+        stocks_msg = format_breakout_summary(signals)
+        full_msg = market_str + stocks_msg
+        
         await msg.delete()
-        await update.message.reply_text(main_msg, parse_mode=ParseMode.MARKDOWN)
-
-        stocks_msg = build_stocks_table_message(stocks)
-        if len(stocks_msg) > 50:
-            await update.message.reply_text(stocks_msg, parse_mode=ParseMode.MARKDOWN)
+        await update.message.reply_text(full_msg[:4000])
 
     except Exception as e:
         logger.error(f"Error in /today: {_sanitize_error(e)}")
         try:
-            await update.message.reply_text("❌ حدث خطأ. يرجى المحاولة لاحقًا.")
+            await update.message.reply_text("❌ حدث خطأ. يرجى المحاولة لاحقاً.")
         except Exception:
             pass
-
 
 async def cmd_market(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """EGX 30 market overview — fast, no stock scan."""
@@ -239,88 +236,61 @@ async def cmd_market(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 
 async def cmd_watchlist(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Top buy and watch opportunities only — no AI summary."""
+    """Show stocks in WAIT state (near breakout confirmation)."""
     if not _check_cooldown(update.effective_chat.id):
-        await update.message.reply_text("⏳ يرجى الانتظار 30 ثانية بين الأوامر.")
+        await update.message.reply_text("⏳ يرجى الانتظار بين الأوامر.")
         return
-    msg = await update.message.reply_text("⏳ جاري مسح الأسهم وتحديد التوصيات…")
+    msg = await update.message.reply_text("⏳ جاري البحث عن أسهم في انتظار التأكيد…")
 
     try:
-        stocks = scan_all_stocks()
-
-        if not stocks:
-            await msg.edit_text(
-                "⚪ لا توجد فرص تداول موثقة اليوم.\n"
-                "البيانات غير كافية أو السوق مغلق."
-            )
+        stock_list = scrape_egx_stock_list()
+        if not stock_list:
+            await msg.edit_text("❌ تعذر جلب قائمة الأسهم.")
             return
-
-        buy = get_buy_signals(stocks)
-        watch = get_watchlist(stocks)
-
-        # Filter out Buy stocks from Watch (avoid duplicates)
-        buy_tickers = {s.ticker for s in buy}
-        watch_only = [s for s in watch if s.ticker not in buy_tickers]
-
-        if not buy and not watch_only:
-            await msg.edit_text(
-                "⚪ لا توجد فرص تداول موثقة اليوم.\n"
-                "لا توجد أسهم بدرجة شراء أو مراقبة."
-            )
+        
+        signals = scan_stocks_breakout(stock_list, download_stock_history)
+        wait_signals = [s for s in signals if s.signal == "WAIT"]
+        buy_signals = [s for s in signals if s.is_buy]
+        
+        if not wait_signals and not buy_signals:
+            await msg.edit_text("⚪ لا توجد أسهم في انتظار التأكيد حالياً.")
             return
-
-        lines = ["🎯 *قائمة المراقبة*", ""]
-
-        if buy:
-            lines.append("🟢 *شراء (درجة 70+):*")
+        
+        lines = []
+        if buy_signals:
+            lines.append("🟢 *إشارات شراء:*")
+            for s in buy_signals:
+                lines.append(f"  • {s.ticker} — {s.close:.2f} | {s.conditions_met}/8 شروط")
             lines.append("")
-            for i, s in enumerate(buy[:10], 1):
-                sr = s.scoring_result
-                lines.append(f"{i}. *{_escape_markdown(s.name_ar)}* ({_escape_markdown(s.ticker)})")
-                lines.append(f"   {_escape_markdown(str(s.current_price))} EGP | درجة: {sr.total_score}/100")
-                if sr.pass_reasons:
-                    lines.append(f"   ✅ {_escape_markdown(sr.pass_reasons[0])}")
-                lines.append("")
-
-        if watch_only:
-            lines.append("🟡 *مراقبة (درجة 50-69):*")
+        
+        if wait_signals:
+            lines.append("⏸ *في انتظار التأكيد:*")
+            for s in sorted(wait_signals, key=lambda x: x.conditions_met, reverse=True):
+                lines.append(f"  • {s.ticker} — {s.close:.2f} | {s.conditions_met}/8 شروط | اختراق: {s.breakout_high:.2f}")
             lines.append("")
-            for i, s in enumerate(watch_only[:5], 1):
-                sr = s.scoring_result
-                lines.append(f"{i}. *{_escape_markdown(s.name_ar)}* ({_escape_markdown(s.ticker)})")
-                lines.append(f"   {_escape_markdown(str(s.current_price))} EGP | درجة: {sr.total_score}/100")
-                lines.append("")
-
-        lines += [
-            "─────────────────────",
-            "⏰ تأكد من البيانات قبل اتخاذ أي قرار",
-        ]
-
+        
+        lines.append("⚙️ EMA50 Breakout Strategy")
+        
         await msg.delete()
-        await update.message.reply_text(
-            _safe_truncate("\n".join(lines), 4000),
-            parse_mode=ParseMode.MARKDOWN,
-        )
+        await update.message.reply_text("\n".join(lines)[:4000])
 
     except Exception as e:
         logger.error(f"Error in /watchlist: {_sanitize_error(e)}")
         try:
-            await update.message.reply_text("❌ حدث خطأ أثناء المسح.")
+            await update.message.reply_text("❌ حدث خطأ. يرجى المحاولة لاحقاً.")
         except Exception:
             pass
 
-
 async def cmd_stock(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Detailed analysis for a specific stock: /stock COMI"""
+    """Detailed breakout analysis for a specific stock: /stock COMI"""
     if not _check_cooldown(update.effective_chat.id):
         await update.message.reply_text("⏳ يرجى الانتظار بين الأوامر.")
         return
     if not context.args:
         await update.message.reply_text(
-            "📋 استخدم: `/stock SYMBOL`\n"
-            "مثال: `/stock COMI`\n\n"
-            "أو جرب: `/stock ETEL` أو `/stock TMGH`",
-            parse_mode=ParseMode.MARKDOWN,
+            "📋 استخدم: /stock SYMBOL\n"
+            "مثال: /stock COMI\n\n"
+            "أو جرب: /stock ETEL أو /stock ORAS"
         )
         return
 
@@ -328,18 +298,19 @@ async def cmd_stock(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     msg = await update.message.reply_text(f"⏳ جاري تحليل {ticker}…")
 
     try:
-        stock = scan_single_stock(ticker)
-
-        if not stock:
+        df = download_stock_history(ticker, n_bars=250, retries=2)
+        
+        if df is None or df.empty:
             await msg.edit_text(
-                f"❌ لم يتم العثور على السهم {_escape_markdown(ticker)}.\n"
+                f"❌ لم يتم العثور على بيانات لـ {ticker}.\n"
                 "تأكد من الرمز أو أن البيانات متوفرة."
             )
             return
-
-        detail = format_stock_detail(stock)
+        
+        signal = evaluate_breakout(df, ticker)
+        detail = format_stock_breakout_detail(signal)
         await msg.delete()
-        await update.message.reply_text(detail, parse_mode=ParseMode.MARKDOWN)
+        await update.message.reply_text(detail)
 
     except Exception as e:
         logger.error(f"Error in /stock: {_sanitize_error(e)}")
@@ -436,6 +407,60 @@ def save_recommendations_json(stocks: list, report_date: str) -> str:
     return str(output_path)
 
 
+def save_breakout_recommendations(signals, report_date: str) -> str:
+    """
+    Save breakout strategy recommendations to JSON file.
+    Only saves BUY signals and WAIT (near-signal) stocks.
+    """
+    import json
+    from pathlib import Path
+
+    recommendations = []
+    current_prices = {}
+
+    for s in signals:
+        if s.close > 0:
+            current_prices[s.ticker] = round(s.close, 2)
+
+        if s.signal in ("BUY", "WAIT"):
+            recommendations.append({
+                "ticker": s.ticker,
+                "score": s.conditions_met * 12,  # 0-96 scale (8 conds * 12)
+                "price": round(s.close, 2),
+                "type": s.signal,  # "BUY" or "WAIT"
+                "breakout_high": round(s.breakout_high, 2) if s.breakout_high else 0,
+                "stop_loss": round(s.stop_loss, 2) if s.stop_loss else 0,
+                "target": round(s.target, 2) if s.target else 0,
+                "rsi": round(s.rsi, 1),
+                "adx": round(s.adx, 1),
+                "conditions_met": s.conditions_met,
+            })
+
+    buy_count = sum(1 for r in recommendations if r["type"] == "BUY")
+    wait_count = sum(1 for r in recommendations if r["type"] == "WAIT")
+
+    data = {
+        "report_date": report_date,
+        "strategy": "EMA50_Breakout",
+        "recommendations": recommendations,
+        "current_prices": current_prices,
+        "total_stocks_scanned": len(signals),
+        "total_recommendations": len(recommendations),
+        "buy_count": buy_count,
+        "wait_count": wait_count,
+    }
+
+    output_dir = Path(__file__).parent / "data"
+    output_dir.mkdir(exist_ok=True)
+    output_path = output_dir / f"recommendations_{report_date}.json"
+
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+    logger.info(f"Saved {len(recommendations)} breakout recommendations ({buy_count} BUY, {wait_count} WAIT) to {output_path}")
+    return str(output_path)
+
+
 async def send_scheduled_report(force: bool = False) -> bool:
     """
     Push daily report to TELEGRAM_CHAT_ID (called by GitHub Actions).
@@ -468,74 +493,64 @@ async def send_scheduled_report(force: bool = False) -> bool:
 
             await bot.send_message(
                 chat_id=chat_id,
-                text="⏳ جاري تحضير التقرير اليومي…\n📊 تحليل 224+ سهم | 15+ مؤشر تقني | درجة من 100",
+                text="⏳ جاري تحضير التقرير اليومي…\n📊 استراتيجية اختراق EMA50 | 224+ سهم | 8 شروط للتأكيد",
             )
 
             # 1. Fetch market data
             logger.info("Step 1/5: Fetching EGX market data...")
             market_summary = build_market_summary()
 
-            # 2. Scan all stocks (validate + download + analyze + score)
-            logger.info("Step 2/5: Scanning all EGX stocks...")
-            stocks = scan_all_stocks()
-
-            if not stocks:
-                # Get detailed failure info
-                status = get_scan_status()
-                failed_sources = ", ".join(status.failed_sources) if status.failed_sources else "غير محدد"
-                
-                # Try to use last successful report as fallback
-                last_report = load_last_report()
-                if last_report and last_report.get("ai_summary"):
-                    fallback_date = last_report.get("date", "غير محدد")
-                    fallback_msg = (
-                        f"⚠️ تعذّر الحصول على بيانات جديدة اليوم.\n"
-                        f"📋 يتم عرض آخر تقرير ناجح من يوم {fallback_date}.\n"
-                        f"🔍 سبب الفشل: {failed_sources}\n\n"
-                        f"{last_report.get('ai_summary', '')[:3000]}"
-                    )
-                    await bot.send_message(chat_id=chat_id, text=fallback_msg)
-                    if last_report.get("stocks_table"):
-                        await bot.send_message(chat_id=chat_id, text=last_report["stocks_table"][:3800])
-                    logger.warning(f"No new data. Sent fallback report from {fallback_date}. Failed: {failed_sources}")
-                else:
-                    await bot.send_message(
-                        chat_id=chat_id,
-                        text=(
-                            f"❌ لا توجد بيانات موثوقة كافية اليوم.\n"
-                            f"🔍 المصدر الفاشل: {failed_sources}\n"
-                            f"⏳ سيتم إعادة المحاولة تلقائيًا."
-                        ),
-                    )
-                    logger.warning(f"No data and no fallback. Failed sources: {failed_sources}")
+            # 2. Scan all stocks using EMA50 Breakout Strategy
+            logger.info("Step 2/5: Scanning EGX stocks (EMA50 Breakout Strategy)...")
+            stock_list = scrape_egx_stock_list()
+            if not stock_list:
+                await bot.send_message(chat_id=chat_id, text="❌ تعذر جلب قائمة الأسهم اليوم.")
                 return False
 
-            # 3. Generate AI explanation
+            logger.info(f"  Got {len(stock_list)} stocks. Running breakout scan...")
+            signals = scan_stocks_breakout(stock_list, download_stock_history)
+            logger.info(f"  Scan complete: {len(signals)} stocks analyzed")
+
+            if not signals:
+                await bot.send_message(
+                    chat_id=chat_id,
+                    text="❌ لا توجد بيانات كافية اليوم. تحقق من مصدر TradingView.",
+                )
+                return False
+
+            # 3. Generate AI explanation (if Gemini available)
             logger.info("Step 3/5: Generating AI analysis...")
-            market_text = format_summary_text(market_summary) if market_summary else ""
-            computed_data = format_analysis_for_ai(stocks, market_text)
-            ai_summary = explain_analysis(computed_data)
+            try:
+                market_text = format_summary_text(market_summary) if market_summary else ""
+                computed_data = format_analysis_for_ai([], market_text)
+                ai_summary = explain_analysis(computed_data)
+            except Exception as ai_err:
+                logger.warning(f"AI analysis failed, using breakout summary only: {ai_err}")
+                ai_summary = ""
 
             # 4. Build Telegram messages
             logger.info("Step 4/5: Building report messages...")
-            main_msg = build_telegram_message(ai_summary, stocks, market_summary)
-            stocks_msg = build_stocks_table_message(stocks)
+            market_str = ""
+            if market_summary and hasattr(market_summary, 'current_value'):
+                market_str = f"📊 EGX 30: {market_summary.current_value:,} ({market_summary.change:+,}, {market_summary.change_pct:+.2f}%)\n"
+
+            if ai_summary:
+                main_msg = f"{market_str}\n{ai_summary[:2500]}"
+            else:
+                main_msg = f"{market_str}"
+
+            # Stocks message: breakout strategy results
+            stocks_msg = format_breakout_summary(signals)
 
             # 5. Send to Telegram
             logger.info("Step 5/5: Sending to Telegram...")
-            # Add limited coverage warning if applicable
-            status = get_scan_status()
-            if status.limited_coverage:
-                warning = f"\n⚠️ تغطية محدودة اليوم: {status.coverage_count} سهم فقط بسبب تعذر الوصول للمصدر الرئيسي\n\n"
-                main_msg = warning + main_msg
-            await bot.send_message(chat_id=chat_id, text=main_msg, parse_mode=ParseMode.MARKDOWN)
-            if len(stocks_msg) > 50:
-                await bot.send_message(chat_id=chat_id, text=stocks_msg, parse_mode=ParseMode.MARKDOWN)
+            await bot.send_message(chat_id=chat_id, text=main_msg[:3800])
+            await bot.send_message(chat_id=chat_id, text=stocks_msg[:3800])
 
             # Save report for future fallback
             save_last_report({
                 "date": datetime.now(CAIRO_TZ).strftime("%Y-%m-%d"),
-                "ai_summary": ai_summary,
+                "ai_summary": ai_summary if ai_summary else "",
                 "stocks_table": stocks_msg if len(stocks_msg) > 50 else "",
                 "market_value": str(market_summary.current_value) if market_summary else "N/A",
                 "market_change": str(market_summary.change) if market_summary else "N/A",
@@ -544,7 +559,7 @@ async def send_scheduled_report(force: bool = False) -> bool:
             # Save recommendations for performance tracking
             report_date = datetime.now(CAIRO_TZ).strftime("%Y-%m-%d")
             try:
-                save_recommendations_json(stocks, report_date)
+                save_breakout_recommendations(signals, report_date)
             except Exception as e:
                 logger.warning(f"Failed to save recommendations JSON: {e}")
 
