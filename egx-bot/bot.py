@@ -50,6 +50,8 @@ from ai_report import (
 from breakout_strategy import (
     evaluate_breakout, scan_stocks_breakout,
     format_breakout_summary, format_stock_breakout_detail,
+    evaluate_pre_breakout, scan_pre_breakout,
+    format_pre_breakout_summary, format_pre_breakout_detail,
 )
 
 logging.basicConfig(
@@ -134,16 +136,16 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show available commands."""
     await update.message.reply_text(
         "🇪🇬 *بوت تحليل البورصة المصرية*\n"
-        "📊 استراتيجية اختراق EMA50\n\n"
+        "📊 Pre-Breakout Scanner | EMA50\n\n"
         "📋 *الأوامر:*\n"
-        "• /today — تقرير يومي (إشارات الشراء والانتظار)\n"
+        "• /today — أسهم قريبة من الاختراق\n"
         "• /market — نظرة على مؤشر EGX 30\n"
-        "• /watchlist — أسهم في انتظار تأكيد الاختراق\n"
+        "• /watchlist — قائمة الأسهم القريبة\n"
         "• /stock SYMBOL — تحليل تفصيلي لسهم\n"
         "   مثال: /stock COMI\n"
         "• /help — هذه الرسالة\n\n"
-        "🔍 224+ سهم | 8 شروط للتأكيد\n"
-        "⚙️ EMA50 + RSI + ADX + Volume\n"
+        "🔍 224+ سهم | score 0-100\n"
+        "🔴 قرب اختراق | 🟡 تحت التجميع\n"
         "⚠️ ليست نصيحة استثمارية",
         parse_mode=ParseMode.MARKDOWN,
     )
@@ -155,13 +157,13 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cmd_today(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Daily report: market overview + EMA50 breakout strategy scan."""
+    """Daily report: pre-breakout scanner — finds stocks ABOUT to break out."""
     if not _check_cooldown(update.effective_chat.id):
         await update.message.reply_text("⏳ يرجى الانتظار 30 ثانية بين الأوامر.")
         return
     msg = await update.message.reply_text(
-        "⏳ جاري تحليل أسهم البورصة المصرية…\n"
-        "📊 استراتيجية اختراق EMA50 | 8 شروط للتأكيد"
+        "⏳ جاري مسح الأسهم القريبة من الاختراق…\n"
+        "📊 Pre-Breakout Scanner | EMA50"
     )
 
     try:
@@ -172,18 +174,19 @@ async def cmd_today(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             await msg.edit_text("❌ تعذر جلب قائمة الأسهم. تحقق من المصدر.")
             return
         
-        signals = scan_stocks_breakout(stock_list, download_stock_history)
+        # Pre-breakout scan (stocks approaching EMA50 breakout)
+        pre_signals = scan_pre_breakout(stock_list, download_stock_history)
         
-        if not signals:
-            await msg.edit_text("❌ لا توجد بيانات كافية اليوم.")
+        if not pre_signals:
+            await msg.edit_text("⚪ لا توجد أسهم قريبة من الاختراق اليوم.")
             return
         
         market_str = ""
         if market_summary and hasattr(market_summary, 'current_value'):
             arrow = "📈" if market_summary.direction == "up" else ("📉" if market_summary.direction == "down" else "➡️")
-            market_str = f"🇪🇬 EGX 30: {market_summary.current_value:,} {arrow} ({market_summary.change_pct}%)" + "\n\n"
+            market_str = f"🇪🇬 EGX 30: {market_summary.current_value:,} {arrow} ({market_summary.change_pct}%)\n\n"
         
-        stocks_msg = format_breakout_summary(signals)
+        stocks_msg = format_pre_breakout_summary(pre_signals)
         full_msg = market_str + stocks_msg
         
         await msg.delete()
@@ -237,11 +240,11 @@ async def cmd_market(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 
 async def cmd_watchlist(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Show stocks in WAIT state (near breakout confirmation)."""
+    """Show stocks approaching breakout (pre-breakout scanner)."""
     if not _check_cooldown(update.effective_chat.id):
         await update.message.reply_text("⏳ يرجى الانتظار بين الأوامر.")
         return
-    msg = await update.message.reply_text("⏳ جاري البحث عن أسهم في انتظار التأكيد…")
+    msg = await update.message.reply_text("⏳ جاري البحث عن أسهم قريبة من الاختراق…")
 
     try:
         stock_list = scrape_egx_stock_list()
@@ -249,28 +252,31 @@ async def cmd_watchlist(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             await msg.edit_text("❌ تعذر جلب قائمة الأسهم.")
             return
         
-        signals = scan_stocks_breakout(stock_list, download_stock_history)
-        wait_signals = [s for s in signals if s.signal == "WAIT"]
-        buy_signals = [s for s in signals if s.is_buy]
+        signals = scan_pre_breakout(stock_list, download_stock_history)
+        approaching = [s for s in signals if s.is_approaching]
+        accumulating = [s for s in signals if s.is_accumulating]
         
-        if not wait_signals and not buy_signals:
-            await msg.edit_text("⚪ لا توجد أسهم في انتظار التأكيد حالياً.")
+        if not approaching and not accumulating:
+            await msg.edit_text("⚪ لا توجد أسهم قريبة من الاختراق حالياً.")
             return
         
         lines = []
-        if buy_signals:
-            lines.append("🟢 *إشارات شراء:*")
-            for s in buy_signals:
-                lines.append(f"  • {s.ticker} — {s.close:.2f} | {s.conditions_met}/8 شروط")
+        if approaching:
+            lines.append("🔴 *قرب الاختراق:*")
+            for s in approaching:
+                lines.append(f"  • {s.ticker} — {s.close:.2f} | dist: {s.distance_pct:.1f}% | score: {s.score}/100")
             lines.append("")
         
-        if wait_signals:
-            lines.append("⏸ *في انتظار التأكيد:*")
-            for s in sorted(wait_signals, key=lambda x: x.conditions_met, reverse=True):
-                lines.append(f"  • {s.ticker} — {s.close:.2f} | {s.conditions_met}/8 شروط | اختراق: {s.breakout_high:.2f}")
+        if accumulating:
+            lines.append("🟡 *تحت التجميع:*")
+            for s in accumulating[:15]:
+                emoji = "🔴" if s.score >= 60 else "🟡"
+                lines.append(f"  {emoji} {s.ticker} — {s.close:.2f} | dist: {s.distance_pct:.1f}% | score: {s.score}/100")
+            if len(accumulating) > 15:
+                lines.append(f"  ... و {len(accumulating) - 15} سهم آخر")
             lines.append("")
         
-        lines.append("⚙️ EMA50 Breakout Strategy")
+        lines.append("⚙️ Pre-Breakout Scanner | EMA50")
         
         await msg.delete()
         await update.message.reply_text("\n".join(lines)[:4000], parse_mode="Markdown")
@@ -283,15 +289,15 @@ async def cmd_watchlist(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             pass
 
 async def cmd_stock(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Detailed breakout analysis for a specific stock: /stock COMI"""
+    """Detailed analysis for a specific stock: /stock COMI
+    Shows pre-breakout if below EMA50, post-breakout if above."""
     if not _check_cooldown(update.effective_chat.id):
         await update.message.reply_text("⏳ يرجى الانتظار بين الأوامر.")
         return
     if not context.args:
         await update.message.reply_text(
             "📋 استخدم: /stock SYMBOL\n"
-            "مثال: /stock COMI\n\n"
-            "أو جرب: /stock ETEL أو /stock ORAS"
+            "مثال: /stock COMI"
         )
         return
 
@@ -308,8 +314,15 @@ async def cmd_stock(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             )
             return
         
-        signal = evaluate_breakout(df, ticker)
-        detail = format_stock_breakout_detail(signal)
+        # Try pre-breakout first (stock below EMA50)
+        pre = evaluate_pre_breakout(df, ticker)
+        if pre.signal in ("APPROACHING", "ACCUMULATING", "NO_SETUP") and not pre.error:
+            detail = format_pre_breakout_detail(pre)
+        else:
+            # Stock above EMA — show post-breakout analysis
+            signal = evaluate_breakout(df, ticker)
+            detail = format_stock_breakout_detail(signal)
+        
         await msg.delete()
         await update.message.reply_text(detail, parse_mode="Markdown")
 
@@ -408,11 +421,8 @@ def save_recommendations_json(stocks: list, report_date: str) -> str:
     return str(output_path)
 
 
-def save_breakout_recommendations(signals, report_date: str) -> str:
-    """
-    Save breakout strategy recommendations to JSON file.
-    Only saves BUY signals and WAIT (near-signal) stocks.
-    """
+def save_pre_breakout_recommendations(signals, report_date: str) -> str:
+    """Save pre-breakout scanner recommendations to JSON file."""
     import json
     from pathlib import Path
 
@@ -420,15 +430,32 @@ def save_breakout_recommendations(signals, report_date: str) -> str:
     current_prices = {}
 
     for s in signals:
-        if s.close > 0:
+        if hasattr(s, 'close') and s.close > 0:
             current_prices[s.ticker] = round(s.close, 2)
 
-        if s.signal in ("BUY", "WAIT"):
+        if hasattr(s, 'score') and s.signal in ("APPROACHING", "ACCUMULATING"):
             recommendations.append({
                 "ticker": s.ticker,
-                "score": s.conditions_met * 12,  # 0-96 scale (8 conds * 12)
+                "score": s.score,
                 "price": round(s.close, 2),
-                "type": s.signal,  # "BUY" or "WAIT"
+                "type": s.signal,
+                "distance_pct": round(s.distance_pct, 2),
+                "ema_value": round(s.ema_value, 2),
+                "consolidation_pct": round(s.consolidation_pct, 2),
+                "volume_trend": s.volume_trend,
+                "rsi": round(s.rsi, 1),
+                "adx": round(s.adx, 1),
+                "higher_lows": s.higher_lows,
+                "stop_loss": round(s.stop_loss, 2) if s.stop_loss else 0,
+                "target": round(s.target, 2) if s.target else 0,
+            })
+        elif hasattr(s, 'conditions_met') and s.signal in ("BUY", "WAIT"):
+            # Post-breakout signals (fallback)
+            recommendations.append({
+                "ticker": s.ticker,
+                "score": s.conditions_met * 12,
+                "price": round(s.close, 2),
+                "type": s.signal,
                 "breakout_high": round(s.breakout_high, 2) if s.breakout_high else 0,
                 "stop_loss": round(s.stop_loss, 2) if s.stop_loss else 0,
                 "target": round(s.target, 2) if s.target else 0,
@@ -437,16 +464,19 @@ def save_breakout_recommendations(signals, report_date: str) -> str:
                 "conditions_met": s.conditions_met,
             })
 
+    approaching_count = sum(1 for r in recommendations if r["type"] == "APPROACHING")
+    accumulating_count = sum(1 for r in recommendations if r["type"] == "ACCUMULATING")
     buy_count = sum(1 for r in recommendations if r["type"] == "BUY")
     wait_count = sum(1 for r in recommendations if r["type"] == "WAIT")
 
     data = {
         "report_date": report_date,
-        "strategy": "EMA50_Breakout",
+        "strategy": "Pre-Breakout Scanner",
         "recommendations": recommendations,
         "current_prices": current_prices,
-        "total_stocks_scanned": len(signals),
         "total_recommendations": len(recommendations),
+        "approaching_count": approaching_count,
+        "accumulating_count": accumulating_count,
         "buy_count": buy_count,
         "wait_count": wait_count,
     }
@@ -458,8 +488,12 @@ def save_breakout_recommendations(signals, report_date: str) -> str:
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-    logger.info(f"Saved {len(recommendations)} breakout recommendations ({buy_count} BUY, {wait_count} WAIT) to {output_path}")
+    logger.info(f"Saved {len(recommendations)} recommendations to {output_path}")
     return str(output_path)
+
+# Keep old function for backward compatibility
+def save_breakout_recommendations(signals, report_date: str) -> str:
+    return save_pre_breakout_recommendations(signals, report_date)
 
 
 async def send_scheduled_report(force: bool = False) -> bool:
@@ -501,30 +535,34 @@ async def send_scheduled_report(force: bool = False) -> bool:
             logger.info("Step 1/5: Fetching EGX market data...")
             market_summary = build_market_summary()
 
-            # 2. Scan all stocks using EMA50 Breakout Strategy
-            logger.info("Step 2/5: Scanning EGX stocks (EMA50 Breakout Strategy)...")
+            # 2. Scan all stocks using Pre-Breakout Scanner
+            logger.info("Step 2/5: Scanning EGX stocks (Pre-Breakout Scanner)...")
             stock_list = scrape_egx_stock_list()
             if not stock_list:
                 await bot.send_message(chat_id=chat_id, text="❌ تعذر جلب قائمة الأسهم اليوم.")
                 return False
 
-            logger.info(f"  Got {len(stock_list)} stocks. Running breakout scan...")
-            signals = scan_stocks_breakout(stock_list, download_stock_history)
-            logger.info(f"  Scan complete: {len(signals)} stocks analyzed")
+            logger.info(f"  Got {len(stock_list)} stocks. Running pre-breakout scan...")
+            pre_signals = scan_pre_breakout(stock_list, download_stock_history)
+            logger.info(f"  Scan complete: {len(pre_signals)} pre-breakout setups found")
 
-            if not signals:
-                await bot.send_message(
-                    chat_id=chat_id,
-                    text="❌ لا توجد بيانات كافية اليوم. تحقق من مصدر TradingView.",
-                )
-                return False
+            if not pre_signals:
+                # Also run post-breakout to check if any just broke out
+                post_signals = scan_stocks_breakout(stock_list, download_stock_history)
+                buy_signals = [s for s in post_signals if s.is_buy]
+                if buy_signals:
+                    stocks_msg = "🟢 *إشارات شراء مؤكدة اليوم:*\n\n" + format_breakout_summary(post_signals)
+                else:
+                    stocks_msg = "⚪ لا توجد أسهم قريبة من الاختراق اليوم.\nسيتم المتابعة غداً."
+            else:
+                stocks_msg = format_pre_breakout_summary(pre_signals)
 
-            # 3. Build market context (skip AI — breakout summary is the main content)
+            # 3. Build market context
             logger.info("Step 3/5: Building market context...")
-            ai_summary = ""
+            market_str = ""
             if market_summary and hasattr(market_summary, 'current_value'):
                 arrow = "📈" if market_summary.direction == "up" else ("📉" if market_summary.direction == "down" else "➡️")
-                ai_summary = f"📊 EGX 30: {market_summary.current_value:,} {arrow} ({market_summary.change:+,}, {market_summary.change_pct:+.2f}%)"
+                market_str = f"📊 EGX 30: {market_summary.current_value:,} {arrow} ({market_summary.change:+,}, {market_summary.change_pct:+.2f}%)"
 
             # 4. Build Telegram messages
             logger.info("Step 4/5: Building report messages...")
@@ -555,7 +593,9 @@ async def send_scheduled_report(force: bool = False) -> bool:
             # Save recommendations for performance tracking
             report_date = datetime.now(CAIRO_TZ).strftime("%Y-%m-%d")
             try:
-                save_breakout_recommendations(signals, report_date)
+                # Save pre-breakout signals (for tracking)
+                all_signals = pre_signals if pre_signals else post_signals if 'post_signals' in dir() else []
+                save_pre_breakout_recommendations(all_signals, report_date)
             except Exception as e:
                 logger.warning(f"Failed to save recommendations JSON: {e}")
 
