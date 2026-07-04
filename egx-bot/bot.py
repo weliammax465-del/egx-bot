@@ -184,7 +184,9 @@ async def cmd_today(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         market_str = ""
         if market_summary and hasattr(market_summary, 'current_value'):
             arrow = "📈" if market_summary.direction == "up" else ("📉" if market_summary.direction == "down" else "➡️")
-            market_str = f"🇪🇬 EGX 30: {market_summary.current_value:,} {arrow} ({market_summary.change_pct}%)\n\n"
+            _val = str(market_summary.current_value)
+            _pct = str(market_summary.change_pct)
+            market_str = f"🇪🇬 EGX 30: {_val} {arrow} ({_pct}%)\n\n"
         
         stocks_msg = format_pre_breakout_summary(pre_signals)
         full_msg = market_str + stocks_msg
@@ -562,29 +564,22 @@ async def send_scheduled_report(force: bool = False) -> bool:
             market_str = ""
             if market_summary and hasattr(market_summary, 'current_value'):
                 arrow = "📈" if market_summary.direction == "up" else ("📉" if market_summary.direction == "down" else "➡️")
-                market_str = f"📊 EGX 30: {market_summary.current_value:,} {arrow} ({market_summary.change:+,}, {market_summary.change_pct:+.2f}%)"
+                _val = str(market_summary.current_value)
+                _chg = str(market_summary.change)
+                _pct = str(market_summary.change_pct)
+                market_str = f"📊 EGX 30: {_val} {arrow} ({_chg}, {_pct}%)"
 
-            # 4. Build Telegram messages
-            logger.info("Step 4/5: Building report messages...")
-            market_str = ""
-            if market_summary and hasattr(market_summary, 'current_value'):
-                market_str = f"📊 EGX 30: {market_summary.current_value:,} ({market_summary.change:+,}, {market_summary.change_pct:+.2f}%)\n"
-
-            main_msg = ai_summary if ai_summary else market_str
-
-            # Stocks message: breakout strategy results
-            stocks_msg = format_breakout_summary(signals)
-
-            # 5. Send to Telegram
-            logger.info("Step 5/5: Sending to Telegram...")
-            if main_msg and len(main_msg) > 10:
-                await bot.send_message(chat_id=chat_id, text=main_msg[:3800])
-            await bot.send_message(chat_id=chat_id, text=stocks_msg[:3800], parse_mode="Markdown")
+            # 4. Send to Telegram
+            logger.info("Step 4/5: Sending to Telegram...")
+            if market_str and len(market_str) > 10:
+                await bot.send_message(chat_id=chat_id, text=market_str[:3800])
+            if stocks_msg and len(stocks_msg) > 10:
+                await bot.send_message(chat_id=chat_id, text=stocks_msg[:3800], parse_mode="Markdown")
 
             # Save report for future fallback
             save_last_report({
                 "date": datetime.now(CAIRO_TZ).strftime("%Y-%m-%d"),
-                "ai_summary": ai_summary if ai_summary else "",
+                "ai_summary": market_str,
                 "stocks_table": stocks_msg if len(stocks_msg) > 50 else "",
                 "market_value": str(market_summary.current_value) if market_summary else "N/A",
                 "market_change": str(market_summary.change) if market_summary else "N/A",
@@ -593,8 +588,7 @@ async def send_scheduled_report(force: bool = False) -> bool:
             # Save recommendations for performance tracking
             report_date = datetime.now(CAIRO_TZ).strftime("%Y-%m-%d")
             try:
-                # Save pre-breakout signals (for tracking)
-                all_signals = pre_signals if pre_signals else post_signals if 'post_signals' in dir() else []
+                all_signals = pre_signals if pre_signals else (post_signals if 'post_signals' in dir() else [])
                 save_pre_breakout_recommendations(all_signals, report_date)
             except Exception as e:
                 logger.warning(f"Failed to save recommendations JSON: {e}")
