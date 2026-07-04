@@ -133,17 +133,18 @@ def _check_cooldown(chat_id: int) -> bool:
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show available commands."""
     await update.message.reply_text(
-        "🇪🇬 *بوت التحليل التقني للبورصة المصرية*\n\n"
-        "📊 *الأوامر المتاحة:*\n"
-        "• /today — تقرير يومي كامل بالدرجات والتوصيات\n"
-        "• /market — نظرة عامة على مؤشر EGX 30\n"
-        "• /watchlist — أقوى فرص الشراء والمراقبة\n"
-        "• /stock SYMBOL — تحليل تفصيلي لسهم معين\n"
+        "🇪🇬 *بوت تحليل البورصة المصرية*\n"
+        "📊 استراتيجية اختراق EMA50\n\n"
+        "📋 *الأوامر:*\n"
+        "• /today — تقرير يومي (إشارات الشراء والانتظار)\n"
+        "• /market — نظرة على مؤشر EGX 30\n"
+        "• /watchlist — أسهم في انتظار تأكيد الاختراق\n"
+        "• /stock SYMBOL — تحليل تفصيلي لسهم\n"
         "   مثال: /stock COMI\n"
         "• /help — هذه الرسالة\n\n"
-        "🔬 يتم تحليل 224+ سهم باستخدام 15+ مؤشر تقني\n"
-        "🎯 درجة محسوبة من 0-100 لكل سهم\n"
-        "📋 توصية: شراء / مراقبة / بيع / لا تداول",
+        "🔍 224+ سهم | 8 شروط للتأكيد\n"
+        "⚙️ EMA50 + RSI + ADX + Volume\n"
+        "⚠️ ليست نصيحة استثمارية",
         parse_mode=ParseMode.MARKDOWN,
     )
 
@@ -186,7 +187,7 @@ async def cmd_today(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         full_msg = market_str + stocks_msg
         
         await msg.delete()
-        await update.message.reply_text(full_msg[:4000])
+        await update.message.reply_text(full_msg[:4000], parse_mode="Markdown")
 
     except Exception as e:
         logger.error(f"Error in /today: {_sanitize_error(e)}")
@@ -272,7 +273,7 @@ async def cmd_watchlist(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         lines.append("⚙️ EMA50 Breakout Strategy")
         
         await msg.delete()
-        await update.message.reply_text("\n".join(lines)[:4000])
+        await update.message.reply_text("\n".join(lines)[:4000], parse_mode="Markdown")
 
     except Exception as e:
         logger.error(f"Error in /watchlist: {_sanitize_error(e)}")
@@ -310,7 +311,7 @@ async def cmd_stock(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         signal = evaluate_breakout(df, ticker)
         detail = format_stock_breakout_detail(signal)
         await msg.delete()
-        await update.message.reply_text(detail)
+        await update.message.reply_text(detail, parse_mode="Markdown")
 
     except Exception as e:
         logger.error(f"Error in /stock: {_sanitize_error(e)}")
@@ -493,7 +494,7 @@ async def send_scheduled_report(force: bool = False) -> bool:
 
             await bot.send_message(
                 chat_id=chat_id,
-                text="⏳ جاري تحضير التقرير اليومي…\n📊 استراتيجية اختراق EMA50 | 224+ سهم | 8 شروط للتأكيد",
+                text="⏳ جاري تحضير التقرير اليومي…",
             )
 
             # 1. Fetch market data
@@ -518,15 +519,12 @@ async def send_scheduled_report(force: bool = False) -> bool:
                 )
                 return False
 
-            # 3. Generate AI explanation (if Gemini available)
-            logger.info("Step 3/5: Generating AI analysis...")
-            try:
-                market_text = format_summary_text(market_summary) if market_summary else ""
-                computed_data = format_analysis_for_ai([], market_text)
-                ai_summary = explain_analysis(computed_data)
-            except Exception as ai_err:
-                logger.warning(f"AI analysis failed, using breakout summary only: {ai_err}")
-                ai_summary = ""
+            # 3. Build market context (skip AI — breakout summary is the main content)
+            logger.info("Step 3/5: Building market context...")
+            ai_summary = ""
+            if market_summary and hasattr(market_summary, 'current_value'):
+                arrow = "📈" if market_summary.direction == "up" else ("📉" if market_summary.direction == "down" else "➡️")
+                ai_summary = f"📊 EGX 30: {market_summary.current_value:,} {arrow} ({market_summary.change:+,}, {market_summary.change_pct:+.2f}%)"
 
             # 4. Build Telegram messages
             logger.info("Step 4/5: Building report messages...")
@@ -534,18 +532,16 @@ async def send_scheduled_report(force: bool = False) -> bool:
             if market_summary and hasattr(market_summary, 'current_value'):
                 market_str = f"📊 EGX 30: {market_summary.current_value:,} ({market_summary.change:+,}, {market_summary.change_pct:+.2f}%)\n"
 
-            if ai_summary:
-                main_msg = f"{market_str}\n{ai_summary[:2500]}"
-            else:
-                main_msg = f"{market_str}"
+            main_msg = ai_summary if ai_summary else market_str
 
             # Stocks message: breakout strategy results
             stocks_msg = format_breakout_summary(signals)
 
             # 5. Send to Telegram
             logger.info("Step 5/5: Sending to Telegram...")
-            await bot.send_message(chat_id=chat_id, text=main_msg[:3800])
-            await bot.send_message(chat_id=chat_id, text=stocks_msg[:3800])
+            if main_msg and len(main_msg) > 10:
+                await bot.send_message(chat_id=chat_id, text=main_msg[:3800])
+            await bot.send_message(chat_id=chat_id, text=stocks_msg[:3800], parse_mode="Markdown")
 
             # Save report for future fallback
             save_last_report({
