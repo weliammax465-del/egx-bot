@@ -38,10 +38,10 @@ logger = logging.getLogger(__name__)
 
 # ─── Strategy Parameters ─────────────────────────────────────────────────────
 
-# EMA_PERIOD imported from config as CFG_EMA_PERIOD
+EMA_PERIOD = CFG_EMA_PERIOD  # from config.py
 RSI_THRESHOLD = 50.0
 ADX_THRESHOLD = 20.0
-# VOLUME_AVG_PERIOD imported from config as CFG_VOLUME_AVG_PERIOD
+VOLUME_AVG_PERIOD = CFG_VOLUME_AVG_PERIOD  # from config.py
 MIN_CANDLES_BELOW = 2
 MIN_BARS_REQUIRED = 60
 EMA_TOLERANCE = 0.005  # 0.5% tolerance for "below EMA" check (avoids noise)
