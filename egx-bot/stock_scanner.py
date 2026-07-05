@@ -209,6 +209,7 @@ def download_stock_history(ticker: str, n_bars: int = 250, retries: int = 2, tim
                 })
                 if "symbol" in df.columns:
                     df = df.drop(columns=["symbol"])
+                _df_cache[ticker] = df  # cache for reuse
                 return df
             if attempt < retries:
                 time.sleep(1 * (attempt + 1))
@@ -216,6 +217,21 @@ def download_stock_history(ticker: str, n_bars: int = 250, retries: int = 2, tim
                 return None
         except Exception as e:
             error_type = classify_scrape_error(e, "TradingView")
+            err_str = str(e).lower()
+            # 429 Too Many Requests — needs much longer wait
+            if '429' in err_str or 'too many requests' in err_str:
+                wait_time = 15 * (attempt + 1)  # 15s, 30s, 45s
+                logger.warning(f"TradingView 429 rate limit for {ticker} — waiting {wait_time}s (attempt {attempt+1})")
+                if attempt < retries:
+                    # Recreate connection on 429 — old connection may be poisoned
+                    global _tv_instance
+                    _tv_instance = None
+                    time.sleep(wait_time)
+                    tv = _get_tv()
+                    continue
+                else:
+                    logger.warning(f"TradingView 429 exhausted for {ticker} after {retries+1} attempts")
+                    return None
             if attempt < retries:
                 time.sleep(2 * (attempt + 1))
             else:
@@ -228,6 +244,7 @@ def download_stock_history(ticker: str, n_bars: int = 250, retries: int = 2, tim
 
 _scan_cache: dict = {}
 _CACHE_TTL = 300  # 5 minutes
+_df_cache: dict = {}  # per-ticker DataFrame cache — avoids re-downloading
 
 
 def _get_cached_scan() -> list[StockAnalysis] | None:

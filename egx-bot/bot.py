@@ -543,7 +543,7 @@ async def send_scheduled_report(force: bool = False) -> bool:
                 return False
 
             logger.info(f"  Got {len(stock_list)} stocks. Running pre-breakout scan...")
-            pre_signals = scan_pre_breakout(stock_list, download_stock_history, max_workers=10, per_stock_timeout=20)
+            pre_signals = scan_pre_breakout(stock_list, download_stock_history, max_workers=3, per_stock_timeout=25)
             logger.info(f"  Scan complete: {len(pre_signals)} pre-breakout setups found")
 
             # 5-star rating system — only send 4+ star stocks
@@ -821,14 +821,18 @@ def _format_5star_message(stock):
 def find_5star_stocks(signals, download_func):
     """
     Evaluate pre-breakout signals and return only 4+ star stocks.
-    Re-downloads data for each signal to compute support/resistance.
+    Uses scan cache to avoid re-downloading (prevents 429 rate limits).
     Filters out penny stocks (price < 1 EGP).
     """
+    from stock_scanner import _df_cache
     evaluated = []
     for signal in signals:
         if signal.score < 40:
             continue
-        df = download_func(signal.ticker, n_bars=150, retries=1)
+        # Try cache first to avoid extra TradingView requests (prevents 429s)
+        df = _df_cache.get(signal.ticker)
+        if df is None:
+            df = download_func(signal.ticker, n_bars=150, retries=1)
         if df is None or len(df) < 50:
             continue
         result = _rate_5star(signal, df)
