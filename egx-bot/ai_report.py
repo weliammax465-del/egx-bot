@@ -16,6 +16,8 @@ import time
 import logging
 from datetime import datetime
 import pytz
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
 import google.generativeai as genai
 
 from indicators import StockAnalysis

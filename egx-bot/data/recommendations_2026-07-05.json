@@ -1,0 +1,16 @@
+{
+  "report_date": "2026-07-05",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "BTFH",
+      "score": 70,
+      "price": 3.0,
+      "type": "APPROACHING",
+      "distance_pct": 1.34,
+      "ema_value": 3.04,
+      "consolidation_pct": 8.0,
+      "volume_trend": "rising",
+      "rsi": 46.5,
+      "adx": 9.8,
+      "higher_lows": 

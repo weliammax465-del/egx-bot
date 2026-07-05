@@ -528,6 +528,11 @@ async def send_scheduled_report(force: bool = False) -> bool:
         try:
             logger.info(f"─── Sending scheduled report (attempt {attempt}/{max_retries}) ───")
 
+            await bot.send_message(
+                chat_id=chat_id,
+                text="⏳ جاري تحضير التقرير اليومي…",
+            )
+
             # 1. Fetch market data
             logger.info("Step 1/5: Fetching EGX market data...")
             market_summary = build_market_summary()
@@ -536,29 +541,23 @@ async def send_scheduled_report(force: bool = False) -> bool:
             logger.info("Step 2/5: Scanning EGX stocks (Pre-Breakout Scanner)...")
             stock_list = scrape_egx_stock_list()
             if not stock_list:
-                try:
-                    await bot.send_message(chat_id=chat_id, text="❌ تعذر جلب قائمة الأسهم اليوم.")
-                except Exception:
-                    pass
+                await bot.send_message(chat_id=chat_id, text="❌ تعذر جلب قائمة الأسهم اليوم.")
                 return False
 
             logger.info(f"  Got {len(stock_list)} stocks. Running pre-breakout scan...")
-            pre_signals = scan_pre_breakout(stock_list, download_stock_history, max_workers=10, per_stock_timeout=20)
+            pre_signals = scan_pre_breakout(stock_list, download_stock_history)
             logger.info(f"  Scan complete: {len(pre_signals)} pre-breakout setups found")
 
-            # 5-star rating system — only send 4+ star stocks
-            five_star, all_evaluated = find_5star_stocks(pre_signals, download_stock_history)
-            logger.info(f"  5-star evaluation: {len(five_star)} stocks with 4+ stars (out of {len(all_evaluated)} evaluated)")
-
-            if five_star:
-                # Send each 5-star stock as a separate message (Yasseen's format)
-                stocks_msg = ""  # Will be sent individually
-            elif all_evaluated:
-                # Send best available even if < 4 stars
-                best = all_evaluated[0]
-                stocks_msg = _format_5star_message(best)
+            if not pre_signals:
+                # Also run post-breakout to check if any just broke out
+                post_signals = scan_stocks_breakout(stock_list, download_stock_history)
+                buy_signals = [s for s in post_signals if s.is_buy]
+                if buy_signals:
+                    stocks_msg = "🟢 *إشارات شراء مؤكدة اليوم:*\n\n" + format_breakout_summary(post_signals)
+                else:
+                    stocks_msg = "⚪ لا توجد أسهم قريبة من الاختراق اليوم.\nسيتم المتابعة غداً."
             else:
-                stocks_msg = f"⚪ لا توجد أسهم تستحق التوصية اليوم.\nتم فحص {len(stock_list)} سهم.\nسيتم المتابعة غداً إن شاء الله."
+                stocks_msg = format_pre_breakout_summary(pre_signals)
 
             # 3. Build market context
             logger.info("Step 3/5: Building market context...")
@@ -568,30 +567,14 @@ async def send_scheduled_report(force: bool = False) -> bool:
                 _val = str(market_summary.current_value)
                 _chg = str(market_summary.change)
                 _pct = str(market_summary.change_pct)
-                market_str = f"📊 EGX 30: {_val} {arrow} ({_chg}, {_pct})"
+                market_str = f"📊 EGX 30: {_val} {arrow} ({_chg}, {_pct}%)"
 
             # 4. Send to Telegram
             logger.info("Step 4/5: Sending to Telegram...")
-            messages_sent = 0
-            try:
-                # Send market summary first
-                if market_str and len(market_str) > 10:
-                    await bot.send_message(chat_id=chat_id, text=market_str[:3800])
-                    messages_sent += 1
-
-                # Send 5-star stocks individually (Yasseen's format)
-                if five_star:
-                    for stock in five_star[:3]:  # Max 3 stocks
-                        msg = _format_5star_message(stock)
-                        await bot.send_message(chat_id=chat_id, text=msg[:3800])
-                        messages_sent += 1
-                        logger.info(f"  Sent {stock['ticker']} ({stock['stars']}⭐)")
-                elif stocks_msg and len(stocks_msg) > 10:
-                    await bot.send_message(chat_id=chat_id, text=stocks_msg[:3800], parse_mode="Markdown")
-                    messages_sent += 1
-            except Exception as send_err:
-                logger.error(f"Telegram send error: {_sanitize_error(send_err, token)}")
-                raise
+            if market_str and len(market_str) > 10:
+                await bot.send_message(chat_id=chat_id, text=market_str[:3800])
+            if stocks_msg and len(stocks_msg) > 10:
+                await bot.send_message(chat_id=chat_id, text=stocks_msg[:3800], parse_mode="Markdown")
 
             # Save report for future fallback
             save_last_report({
@@ -605,10 +588,8 @@ async def send_scheduled_report(force: bool = False) -> bool:
             # Save recommendations for performance tracking
             report_date = datetime.now(CAIRO_TZ).strftime("%Y-%m-%d")
             try:
-                signals_to_save = five_star if five_star else all_evaluated[:5]
-                save_pre_breakout_recommendations(
-                    [s['signal'] for s in signals_to_save], report_date
-                )
+                all_signals = pre_signals if pre_signals else (post_signals if 'post_signals' in dir() else [])
+                save_pre_breakout_recommendations(all_signals, report_date)
             except Exception as e:
                 logger.warning(f"Failed to save recommendations JSON: {e}")
 
@@ -626,8 +607,10 @@ async def send_scheduled_report(force: bool = False) -> bool:
                 time.sleep(wait)
             else:
                 logger.error("❌ All retry attempts exhausted.")
-                # Silent failure — GitHub Actions workflow already sends Telegram notification
-                logger.error("❌ All retry attempts exhausted. Exiting silently.")
+                try:
+                    await bot.send_message(chat_id=chat_id, text="❌ تعذّر إرسال التقرير اليوم بعد عدة محاولات.")
+                except Exception:
+                    pass
                 sys.exit(1)
 
     return False
@@ -663,188 +646,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-
-# ─── 5-Star Rating System ────────────────────────────────────────────────────
-
-def _compute_support_resistance(df):
-    """Compute support and resistance levels from price data."""
-    if df is None or len(df) < 20:
-        return None, None, None
-
-    current_price = float(df['Close'].iloc[-1])
-    recent = df.tail(60)
-
-    # Support = recent swing lows
-    lows = recent['Low'].values
-    sup_cands = []
-    for i in range(2, len(lows) - 2):
-        if lows[i] == min(lows[i-2:i+3]):
-            sup_cands.append(float(lows[i]))
-    support = max(sup_cands[-3:]) if len(sup_cands) >= 3 else (
-        max(sup_cands) if sup_cands else float(recent['Low'].min())
-    )
-
-    # Resistance = recent swing highs
-    highs = recent['High'].values
-    res_cands = []
-    for i in range(2, len(highs) - 2):
-        if highs[i] == max(highs[i-2:i+3]):
-            res_cands.append(float(highs[i]))
-    resistance = min(res_cands[-3:]) if len(res_cands) >= 3 else (
-        min(res_cands) if res_cands else float(recent['High'].max())
-    )
-
-    # EMA50 as resistance if price below
-    if len(df) >= 50:
-        ema50 = df['Close'].ewm(span=50, adjust=False).mean().iloc[-1]
-        if current_price < ema50:
-            resistance = min(resistance, float(ema50))
-
-    return current_price, support, resistance
-
-
-def _rate_5star(signal, df):
-    """
-    Rate a stock 0-5 stars based on breakout readiness.
-    Only 4-5 star stocks are considered "five-star" quality.
-    """
-    stars = 0
-    reasons = []
-
-    # Star 1: Distance from EMA50 (must be very close)
-    if abs(signal.distance_pct) <= 1.5:
-        stars += 1
-        reasons.append(f"السعر ملاصق لـ EMA50 ({signal.distance_pct:+.1f}%)")
-    elif abs(signal.distance_pct) <= 3.0:
-        stars += 1
-        reasons.append(f"السعر قريب من EMA50 ({signal.distance_pct:+.1f}%)")
-
-    # Star 2: Volume rising (accumulation happening)
-    if signal.volume_trend == "rising" and signal.volume_ratio >= 1.3:
-        stars += 1
-        reasons.append(f"حجم تداول صاعد قوي ({signal.volume_ratio:.1f}x المتوسط)")
-    elif signal.volume_trend == "rising":
-        stars += 1
-        reasons.append(f"حجم تداول في تصاعد ({signal.volume_ratio:.1f}x)")
-
-    # Star 3: RSI in optimal zone (45-60, rising = momentum building)
-    if 45 <= signal.rsi <= 60 and signal.rsi_trend == "rising":
-        stars += 1
-        reasons.append(f"RSI في المنطقة الذهبية ({signal.rsi:.0f} صاعد)")
-    elif 40 <= signal.rsi <= 65 and signal.rsi_trend == "rising":
-        stars += 1
-        reasons.append(f"RSI صاعد ({signal.rsi:.0f})")
-
-    # Star 4: ADX shows trend strength
-    if signal.adx >= 20 and signal.adx_trend == "rising":
-        stars += 1
-        reasons.append(f"ADX قوي وصاعد ({signal.adx:.0f}) — اتجاه يتكون")
-    elif signal.adx >= 25:
-        stars += 1
-        reasons.append(f"ADX قوي ({signal.adx:.0f})")
-
-    # Star 5: Higher lows (structural support confirmed)
-    if signal.higher_lows:
-        stars += 1
-        reasons.append("قيعان صاعدة — دعم هيكلي مؤكد")
-
-    # Compute support/resistance and risk management
-    current_price, support, resistance = _compute_support_resistance(df)
-
-    target = None
-    stop_loss = None
-    rr_ratio = None
-    if support and resistance and current_price:
-        target = resistance + (resistance - support) * 0.5
-        stop_loss = support * 0.99  # 1% below support
-        risk = current_price - stop_loss
-        reward = target - current_price
-        if risk > 0:
-            rr_ratio = reward / risk
-
-    return {
-        'ticker': signal.ticker,
-        'stars': stars,
-        'reasons': reasons,
-        'price': current_price,
-        'support': support,
-        'resistance': resistance,
-        'target': target,
-        'stop_loss': stop_loss,
-        'rr_ratio': rr_ratio,
-        'signal': signal,
-    }
-
-
-def _format_5star_message(stock):
-    """Format a 5-star stock recommendation as Yasseen requested."""
-    s = stock['signal']
-    stars_str = "⭐" * max(stock['stars'], 1)
-
-    p = f"{stock['price']:.2f}" if stock['price'] else "N/A"
-    sup = f"{stock['support']:.2f}" if stock['support'] else "N/A"
-    res = f"{stock['resistance']:.2f}" if stock['resistance'] else "N/A"
-    tgt = f"{stock['target']:.2f}" if stock['target'] else "N/A"
-    sl = f"{stock['stop_loss']:.2f}" if stock['stop_loss'] else "N/A"
-    rr = f"{stock['rr_ratio']:.1f}:1" if stock['rr_ratio'] else "N/A"
-
-    msg = f"{stars_str}\n"
-    msg += f"📊 {stock['ticker']}\n"
-    msg += f"━━━━━━━━━━━━━━━\n"
-    msg += f"💰 السعر: {p} EGP\n"
-    msg += f"🟢 الدعم: {sup} EGP\n"
-    msg += f"🔴 المقاومة: {res} EGP\n"
-    msg += f"━━━━━━━━━━━━━━━\n"
-    msg += f"🎯 الهدف: {tgt} EGP\n"
-    msg += f"🛑 ستوب لوس: {sl} EGP\n"
-    msg += f"📈 المخاطرة/العائد: {rr}\n"
-    msg += f"━━━━━━━━━━━━━━━\n"
-    msg += f"📋 ليه هذا السهم؟\n"
-    for r in stock['reasons']:
-        msg += f"  ✅ {r}\n"
-    if not stock['reasons']:
-        msg += f"  • Score: {s.score}/100\n"
-    msg += f"━━━━━━━━━━━━━━━\n"
-    msg += f"📊 المؤشرات:\n"
-    msg += f"  • المسافة من EMA50: {s.distance_pct:+.1f}%\n"
-    msg += f"  • RSI: {s.rsi:.0f} ({s.rsi_trend})\n"
-    msg += f"  • ADX: {s.adx:.0f} ({s.adx_trend})\n"
-    msg += f"  • الحجم: {s.volume_trend} ({s.volume_ratio:.1f}x)\n"
-    msg += f"  • قيعان صاعدة: {'نعم ✅' if s.higher_lows else 'لا ❌'}\n"
-    msg += f"━━━━━━━━━━━━━━━\n"
-    msg += f"⚠️ هذه ليست نصيحة مالية. التداول ينطوي على مخاطر."
-
-    return msg
-
-
-def find_5star_stocks(signals, download_func):
-    """
-    Evaluate pre-breakout signals and return only 4+ star stocks.
-    Re-downloads data for each signal to compute support/resistance.
-    Filters out penny stocks (price < 1 EGP).
-    """
-    evaluated = []
-    for signal in signals:
-        if signal.score < 40:
-            continue
-        df = download_func(signal.ticker, n_bars=150, retries=1)
-        if df is None or len(df) < 50:
-            continue
-        result = _rate_5star(signal, df)
-        # Filter out penny stocks (price < 1 EGP)
-        if result['price'] and result['price'] < 1.0:
-            continue
-        # Filter out stocks with no support/resistance
-        if result['support'] is None or result['resistance'] is None:
-            continue
-        # Filter out stocks with R/R < 1.5
-        if result['rr_ratio'] and result['rr_ratio'] < 1.5:
-            continue
-        evaluated.append(result)
-
-    # Sort by stars (desc), then by score (desc)
-    evaluated.sort(key=lambda x: (x['stars'], x['signal'].score), reverse=True)
-
-    # Return only 4+ star stocks
-    return [s for s in evaluated if s['stars'] >= 4], evaluated
