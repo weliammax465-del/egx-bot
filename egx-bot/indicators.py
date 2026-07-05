@@ -355,7 +355,7 @@ def calc_obv(df: pd.DataFrame) -> IndicatorResult:
     obv_ind = OnBalanceVolumeIndicator(close=df["Close"], volume=df["Volume"])
     obv = obv_ind.on_balance_volume().iloc[-1]
     obv_series = obv_ind.on_balance_volume().tail(10)
-    obv_slope = (obv_series.iloc[-1] - obv_series.iloc[0]) / len(obv_series)
+    obv_slope = (obv_series.iloc[-1] - obv_series.iloc[0]) / len(obv_series) if len(obv_series) > 0 else 0
 
     avg_vol = df["Volume"].tail(20).mean()
     obv_normalized = obv_slope / avg_vol if avg_vol > 0 else 0

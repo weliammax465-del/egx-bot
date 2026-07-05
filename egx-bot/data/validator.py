@@ -101,7 +101,7 @@ def validate_ohlcv(df: pd.DataFrame, ticker: str) -> ValidationResult:
     inconsistent = int(((h < l) | (h < o) | (h < c) | (l > o) | (l > c)).sum())
 
     if inconsistent > 0:
-        pct = (inconsistent / len(df)) * 100
+        pct = (inconsistent / len(df)) * 100 if len(df) > 0 else 0
         if pct > 5:
             result.add_issue(f"{ticker}: {inconsistent} bars with inconsistent OHLC ({pct:.1f}%)", "error")
         else:
