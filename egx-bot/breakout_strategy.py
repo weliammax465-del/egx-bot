@@ -25,15 +25,23 @@ from typing import Optional
 
 import numpy as np
 import pandas as pd
+from config import (
+    EMA_PERIOD as CFG_EMA_PERIOD,
+    VOLUME_AVG_PERIOD as CFG_VOLUME_AVG_PERIOD,
+    ADX_THRESHOLD as CFG_ADX_THRESHOLD,
+    RSI_MOMENTUM_THRESHOLD as CFG_RSI_MOMENTUM,
+    BELOW_EMA_TOLERANCE as CFG_EMA_TOLERANCE,
+    MIN_CANDLES_BELOW_EMA as CFG_MIN_CANDLES_BELOW,
+)
 
 logger = logging.getLogger(__name__)
 
 # ─── Strategy Parameters ─────────────────────────────────────────────────────
 
-EMA_PERIOD = 50
+# EMA_PERIOD imported from config as CFG_EMA_PERIOD
 RSI_THRESHOLD = 50.0
 ADX_THRESHOLD = 20.0
-VOLUME_AVG_PERIOD = 20
+# VOLUME_AVG_PERIOD imported from config as CFG_VOLUME_AVG_PERIOD
 MIN_CANDLES_BELOW = 2
 MIN_BARS_REQUIRED = 60
 EMA_TOLERANCE = 0.005  # 0.5% tolerance for "below EMA" check (avoids noise)

@@ -103,3 +103,24 @@ STALE_DATA_HOURS: int = 24
 #: Suspicious daily price movement threshold. Above this = possible
 #: data error, not a real move. Triggers a flag, not outright rejection.
 SUSPICIOUS_PRICE_CHANGE_PCT: float = 20.0
+
+
+# ─── Breakout Strategy (EMA50 Breakout) ──────────────────────────────────────
+
+#: EMA period for breakout detection. Price crossing above this = breakout.
+EMA_PERIOD: int = 50
+
+#: Period for volume average calculation (volume confirmation).
+VOLUME_AVG_PERIOD: int = 20
+
+#: ADX threshold for trend strength. Below this = no clear trend.
+ADX_THRESHOLD: float = 20.0
+
+#: RSI threshold for momentum confirmation. Above this = bullish momentum.
+RSI_MOMENTUM_THRESHOLD: float = 50.0
+
+#: Tolerance (fraction) for "below EMA" check to avoid float precision issues.
+BELOW_EMA_TOLERANCE: float = 0.005
+
+#: Minimum number of candles below EMA50 before a breakout is valid.
+MIN_CANDLES_BELOW_EMA: int = 2
