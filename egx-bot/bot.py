@@ -416,8 +416,21 @@ def save_recommendations_json(stocks: list, report_date: str) -> str:
     output_dir.mkdir(exist_ok=True)
     output_path = output_dir / f"recommendations_{report_date}.json"
     
+    def _json_default(obj):
+        """Convert numpy types to native Python for JSON serialization."""
+        import numpy as np
+        if isinstance(obj, (np.bool_, bool)):
+            return bool(obj)
+        if isinstance(obj, (np.integer, int)):
+            return int(obj)
+        if isinstance(obj, (np.floating, float)):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return str(obj)
+
     with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+        json.dump(data, f, ensure_ascii=False, indent=2, default=_json_default)
     
     logger.info(f"Saved {len(recommendations)} recommendations to {output_path}")
     return str(output_path)
@@ -487,8 +500,21 @@ def save_pre_breakout_recommendations(signals, report_date: str) -> str:
     output_dir.mkdir(exist_ok=True)
     output_path = output_dir / f"recommendations_{report_date}.json"
 
+    def _json_default(obj):
+        """Convert numpy types to native Python for JSON serialization."""
+        import numpy as np
+        if isinstance(obj, (np.bool_, bool)):
+            return bool(obj)
+        if isinstance(obj, (np.integer, int)):
+            return int(obj)
+        if isinstance(obj, (np.floating, float)):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return str(obj)
+
     with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+        json.dump(data, f, ensure_ascii=False, indent=2, default=_json_default)
 
     logger.info(f"Saved {len(recommendations)} recommendations to {output_path}")
     return str(output_path)
