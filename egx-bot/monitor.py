@@ -41,7 +41,47 @@ WORKFLOW_FILE = "daily.yml"
 WORKFLOW_NAME = "EGX Daily Technical Analysis Report"
 
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "7534010234")
-GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
+def _resolve_github_token() -> str:
+    """
+    Self-healing token resolver: tries GITHUB_TOKEN, then GITHUB_TOKEN_2,
+    GITHUB_TOKEN_3, ... in order, validating each against the GitHub API.
+    Returns the first token that authenticates successfully.
+    This prevents the whole monitor from breaking if one specific secret
+    slot happens to hold a dead/revoked token while another slot has a
+    live one.
+    """
+    candidates = []
+    primary = os.environ.get("GITHUB_TOKEN", "")
+    if primary:
+        candidates.append(("GITHUB_TOKEN", primary))
+    i = 2
+    while True:
+        val = os.environ.get(f"GITHUB_TOKEN_{i}", "")
+        if not val:
+            break
+        candidates.append((f"GITHUB_TOKEN_{i}", val))
+        i += 1
+
+    for name, token in candidates:
+        try:
+            resp = requests.get(
+                "https://api.github.com/user",
+                headers={"Authorization": f"token {token}"},
+                timeout=10,
+            )
+            if resp.status_code == 200:
+                print(f"[token] Using valid token from {name}")
+                return token
+            else:
+                print(f"[token] {name} invalid (HTTP {resp.status_code}) — trying next")
+        except Exception as e:
+            print(f"[token] {name} check failed: {e} — trying next")
+
+    print("[token] WARNING: no valid GitHub token found among candidates")
+    return primary  # fall back to primary (will fail downstream with clear error)
+
+
+GITHUB_TOKEN = _resolve_github_token()
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 
 CAIRO_TZ = timezone(timedelta(hours=2))
