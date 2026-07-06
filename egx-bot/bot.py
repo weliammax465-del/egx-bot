@@ -661,8 +661,6 @@ def main() -> None:
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
-if __name__ == "__main__":
-    main()
 
 
 # ─── 5-Star Rating System ────────────────────────────────────────────────────
@@ -852,3 +850,8 @@ def find_5star_stocks(signals, download_func):
 
     # Return only 4+ star stocks
     return [s for s in evaluated if s['stars'] >= 4], evaluated
+
+if __name__ == "__main__":
+    main()
+
+
