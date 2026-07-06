@@ -36,13 +36,20 @@ from telegram import Update, Bot
 from telegram.ext import Application, CommandHandler, ContextTypes
 from telegram.constants import ParseMode
 
-from fetch_egx import build_market_summary
+from fetch_egx import build_market_summary, format_summary_text
 from stock_scanner import (
-    scrape_egx_stock_list, download_stock_history, save_last_report,
+    scan_all_stocks, format_analysis_for_ai,
+    get_buy_signals, get_watchlist,
+    scan_single_stock, scrape_egx_stock_list, download_stock_history,
+    get_scan_status, load_last_report, save_last_report,
 )
-from ai_report import _escape_markdown
+from ai_report import (
+    explain_analysis, build_telegram_message, build_stocks_table_message,
+    format_stock_detail, _escape_markdown, _safe_truncate,
+)
 from breakout_strategy import (
-    evaluate_breakout, format_stock_breakout_detail,
+    evaluate_breakout, scan_stocks_breakout,
+    format_breakout_summary, format_stock_breakout_detail,
     evaluate_pre_breakout, scan_pre_breakout,
     format_pre_breakout_summary, format_pre_breakout_detail,
 )

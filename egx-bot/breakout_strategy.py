@@ -21,8 +21,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Optional
-
 import numpy as np
 import pandas as pd
 from config import (
@@ -39,12 +37,12 @@ logger = logging.getLogger(__name__)
 # ─── Strategy Parameters ─────────────────────────────────────────────────────
 
 EMA_PERIOD = CFG_EMA_PERIOD  # from config.py
-RSI_THRESHOLD = 50.0
-ADX_THRESHOLD = 20.0
+RSI_THRESHOLD = CFG_RSI_MOMENTUM  # from config.py (was hardcoded 50.0 — now actually linked)
+ADX_THRESHOLD = CFG_ADX_THRESHOLD  # from config.py (was hardcoded 20.0 — now actually linked)
 VOLUME_AVG_PERIOD = CFG_VOLUME_AVG_PERIOD  # from config.py
-MIN_CANDLES_BELOW = 2
+MIN_CANDLES_BELOW = CFG_MIN_CANDLES_BELOW  # from config.py (was hardcoded 2 — now actually linked)
 MIN_BARS_REQUIRED = 60
-EMA_TOLERANCE = 0.005  # 0.5% tolerance for "below EMA" check (avoids noise)
+EMA_TOLERANCE = CFG_EMA_TOLERANCE  # from config.py (was hardcoded 0.005 — now actually linked)
 
 
 # ─── Data Class ──────────────────────────────────────────────────────────────
