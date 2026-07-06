@@ -198,7 +198,7 @@ def clone_and_read_json() -> dict | None:
 
     today = cairo_today_str()
     json_path = os.path.join(
-        CLONE_DIR, "data", f"recommendations_{today}.json"
+        CLONE_DIR, "egx-bot", "data", f"recommendations_{today}.json"
     )
 
     if not os.path.exists(json_path):
