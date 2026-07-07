@@ -518,10 +518,6 @@ def save_pre_breakout_recommendations(signals, report_date: str) -> str:
     logger.info(f"Saved {len(recommendations)} recommendations to {output_path}")
     return str(output_path)
 
-# Keep old function for backward compatibility
-def save_breakout_recommendations(signals, report_date: str) -> str:
-    return save_pre_breakout_recommendations(signals, report_date)
-
 
 async def send_scheduled_report(force: bool = False) -> bool:
     """

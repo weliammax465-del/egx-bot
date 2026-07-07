@@ -308,8 +308,6 @@ def calc_ema_trend(df: pd.DataFrame) -> IndicatorResult:
     ema50 = EMAIndicator(close=df["Close"], window=50).ema_indicator().iloc[-1]
     price = df["Close"].iloc[-1]
 
-    has_ema200 = len(df) >= 200
-    ema200 = EMAIndicator(close=df["Close"], window=200).ema_indicator().iloc[-1] if has_ema200 else None
 
     if price > ema20 > ema50:
         signal, note = 1, "ترتيب EMA صاعد"

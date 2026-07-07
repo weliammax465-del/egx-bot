@@ -14,7 +14,6 @@ No API key required — the function uses service-role access.
 from __future__ import annotations
 
 import logging
-import os
 from datetime import datetime
 from typing import Any
 
