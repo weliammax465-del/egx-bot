@@ -26,12 +26,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4.2.2
 
-      - name: Get today's date (UTC)
+      - name: Get today's date (Cairo time — matches bot.py)
         id: date
-        run: echo "today=$(date -u +%Y-%m-%d)" >> $GITHUB_OUTPUT
+        run: |
+          # CRITICAL: Must use Cairo time, NOT UTC.
+          # bot.py writes the flag file with datetime.now(CAIRO_TZ).
+          # If we use UTC here and GitHub delays the cron past 22:00 UTC
+          # (midnight Cairo), the cache key would be the UTC date while
+          # the flag file has the Cairo date — mismatch = duplicate sends.
+          TZ="Africa/Cairo" echo "today=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
 
       # ── Duplicate Prevention ──────────────────────────────────────
-      # Cache key is date-based: if today's report was already sent,
+      # Cache key is date-based (Cairo): if today's report was already sent,
       # the cache hit skips all subsequent steps.
       - name: Check if report already sent today
         id: check-sent
