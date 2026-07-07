@@ -55,7 +55,13 @@ logger = logging.getLogger(__name__)
 
 REQUIRED_ENV = ["TELEGRAM_BOT_TOKEN", "GEMINI_API_KEY"]
 CAIRO_TZ = pytz.timezone("Africa/Cairo")
-SENT_FLAG_FILE = os.path.join(os.environ.get("GITHUB_WORKSPACE", os.path.dirname(__file__)), ".egx_sent_today")
+# NOTE: Must resolve to the egx-bot/ subfolder specifically (where this file
+# lives), NOT the repo root. GITHUB_WORKSPACE in CI points to the repo ROOT
+# (this repo has egx-bot/ as a subfolder alongside .github/, base44/, etc.),
+# so using it here caused the flag file to be written to the wrong path —
+# the workflow's cache step looks for "egx-bot/.egx_sent_today" specifically,
+# so a mismatch meant the duplicate-send guard silently never worked in CI.
+SENT_FLAG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".egx_sent_today")
 
 
 def check_env() -> None:
