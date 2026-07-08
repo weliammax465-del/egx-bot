@@ -106,14 +106,29 @@ def _ema(series: pd.Series, period: int) -> pd.Series:
     return series.ewm(span=period, adjust=False).mean()
 
 def _rsi(close: pd.Series, period: int = 14) -> pd.Series:
+    """Wilder-style RSI (EMA-smoothed gains/losses).
+
+    Edge case (fixed 2026-07-08): when avg_loss == 0 (an uninterrupted run of
+    gains within the window — happens on thin EGX stocks that gap up daily
+    with no down days), RS = avg_gain/0 is undefined. The correct RSI value
+    here is 100 (maximum bullish momentum), NOT 50/neutral — a flat fillna(50)
+    would silently fail the `RSI > 50` momentum gate (cond4) for the single
+    strongest possible uptrend case, blocking a valid BUY signal.
+    """
     delta = close.diff()
     gain = delta.clip(lower=0)
     loss = (-delta).clip(lower=0)
     avg_gain = gain.ewm(alpha=1/period, adjust=False).mean()
     avg_loss = loss.ewm(alpha=1/period, adjust=False).mean()
+
     rs = avg_gain / avg_loss.replace(0, np.nan)
     rsi = 100 - (100 / (1 + rs))
-    return rsi.fillna(50)
+
+    # avg_loss == 0: RSI is 100 if there was any gain, else 50 (perfectly flat)
+    zero_loss_mask = avg_loss == 0
+    rsi = rsi.where(~zero_loss_mask, np.where(avg_gain > 0, 100.0, 50.0))
+
+    return pd.Series(rsi, index=close.index).fillna(50)
 
 def _adx(high: pd.Series, low: pd.Series, close: pd.Series, period: int = 14) -> tuple:
     tr1 = high - low

@@ -1320,3 +1320,177 @@ class TestFind5StarFilters:
             pass  # skipped
         else:
             assert False, "Stock should have been filtered out"
+
+
+class TestRSIADXAccuracy:
+    """
+    Validate our custom RSI/ADX implementations (breakout_strategy.py) against
+    the industry-standard `ta` library. Ensures signal calculations used for
+    live BUY/WAIT decisions are mathematically correct, not just "runs without
+    crashing." Added 2026-07-08 per user request to audit indicator accuracy.
+    """
+
+    def _make_price_series(self, n=120, seed=1):
+        import pandas as pd
+        import numpy as np
+        np.random.seed(seed)
+        price = 100.0
+        closes = []
+        for _ in range(n):
+            price += np.random.normal(0.1, 1.5)
+            closes.append(max(price, 10.0))
+        closes = pd.Series(closes)
+        highs = closes + np.random.uniform(0.2, 1.0, n)
+        lows = closes - np.random.uniform(0.2, 1.0, n)
+        return closes, highs, lows
+
+    def test_rsi_matches_ta_library_after_warmup(self):
+        """Our EMA-based RSI converges to the `ta` library's Wilder-smoothed
+        RSI within a small tolerance once enough bars have passed (>= 100)."""
+        from breakout_strategy import _rsi
+        from ta.momentum import RSIIndicator
+
+        closes, _, _ = self._make_price_series()
+        ours = _rsi(closes, 14)
+        theirs = RSIIndicator(close=closes, window=14).rsi()
+
+        diff = (ours - theirs).abs().iloc[99:]  # after warmup
+        assert diff.max() < 0.5, f"RSI diverges from reference by {diff.max():.2f} after warmup"
+
+    def test_rsi_bounded_0_to_100(self):
+        from breakout_strategy import _rsi
+        closes, _, _ = self._make_price_series()
+        rsi = _rsi(closes, 14)
+        assert (rsi >= 0).all() and (rsi <= 100).all()
+
+    def test_rsi_flat_price_is_neutral(self):
+        """Flat/no-change price series should produce RSI near 50 (no gain/loss)."""
+        import pandas as pd
+        from breakout_strategy import _rsi
+        closes = pd.Series([15.0] * 30)
+        rsi = _rsi(closes, 14)
+        assert abs(rsi.iloc[-1] - 50.0) < 1.0
+
+    def test_rsi_strictly_rising_price_above_70(self):
+        """A steadily rising price series should push RSI into overbought territory."""
+        import pandas as pd
+        from breakout_strategy import _rsi
+        closes = pd.Series([10.0 + i * 0.5 for i in range(40)])
+        rsi = _rsi(closes, 14)
+        assert rsi.iloc[-1] > 70
+
+    def test_rsi_zero_loss_run_is_100_not_neutral(self):
+        """REGRESSION (found 2026-07-08): an uninterrupted run of gains within
+        the RSI window (avg_loss == 0) must produce RSI == 100 (max bullish
+        momentum), not a fallback of 50/neutral. A flat 50 would wrongly
+        fail the `RSI > 50` momentum gate (cond4) for the strongest possible
+        uptrend — exactly the scenario it's supposed to confirm."""
+        import pandas as pd
+        import numpy as np
+        from breakout_strategy import _rsi
+        np.random.seed(3)
+        closes = pd.Series([10.0 + i * 0.5 + np.random.uniform(-0.15, 0.15) for i in range(40)])
+        assert (closes.diff().dropna() > 0).all(), "test setup must have zero down days"
+        rsi = _rsi(closes, 14)
+        assert rsi.iloc[-1] == 100.0
+
+    def test_rsi_zero_gain_run_is_near_zero(self):
+        """Symmetric case: an uninterrupted run of losses (avg_gain == 0)
+        must produce RSI near 0, not a neutral fallback."""
+        import pandas as pd
+        import numpy as np
+        from breakout_strategy import _rsi
+        np.random.seed(3)
+        closes = pd.Series([50.0 - i * 0.5 - np.random.uniform(-0.15, 0.15) for i in range(40)])
+        assert (closes.diff().dropna() < 0).all(), "test setup must have zero up days"
+        rsi = _rsi(closes, 14)
+        assert rsi.iloc[-1] < 1.0
+
+    def test_rsi_perfectly_flat_price_stays_50(self):
+        """A perfectly flat price series (avg_gain == avg_loss == 0) must
+        stay at neutral 50, not accidentally flip to 100."""
+        import pandas as pd
+        from breakout_strategy import _rsi
+        closes = pd.Series([15.0] * 30)
+        rsi = _rsi(closes, 14)
+        assert rsi.iloc[-1] == 50.0
+
+    def test_rsi_strictly_falling_price_below_30(self):
+        """A steadily falling price series should push RSI into oversold territory."""
+        import pandas as pd
+        from breakout_strategy import _rsi
+        closes = pd.Series([50.0 - i * 0.5 for i in range(40)])
+        rsi = _rsi(closes, 14)
+        assert rsi.iloc[-1] < 30
+
+    def test_adx_matches_ta_library_after_warmup(self):
+        """Our custom ADX/+DI/-DI converge to the `ta` library reference
+        within a small tolerance once enough bars have passed (>= 100)."""
+        from breakout_strategy import _adx
+        from ta.trend import ADXIndicator
+
+        closes, highs, lows = self._make_price_series()
+        our_adx, our_plus, our_minus = _adx(highs, lows, closes, 14)
+
+        ref = ADXIndicator(high=highs, low=lows, close=closes, window=14)
+        their_adx = ref.adx()
+        their_plus = ref.adx_pos()
+        their_minus = ref.adx_neg()
+
+        adx_diff = (our_adx - their_adx).abs().iloc[99:]
+        plus_diff = (our_plus - their_plus).abs().iloc[99:]
+        minus_diff = (our_minus - their_minus).abs().iloc[99:]
+
+        assert adx_diff.max() < 0.5, f"ADX diverges by {adx_diff.max():.2f} after warmup"
+        assert plus_diff.max() < 0.5, f"+DI diverges by {plus_diff.max():.2f} after warmup"
+        assert minus_diff.max() < 0.5, f"-DI diverges by {minus_diff.max():.2f} after warmup"
+
+    def test_adx_non_negative(self):
+        from breakout_strategy import _adx
+        closes, highs, lows = self._make_price_series()
+        adx, plus_di, minus_di = _adx(highs, lows, closes, 14)
+        assert (adx >= 0).all()
+        assert (plus_di >= 0).all()
+        assert (minus_di >= 0).all()
+
+    def test_adx_strong_uptrend_plus_di_dominates(self):
+        """In a clean, strong uptrend, +DI should be greater than -DI on the
+        latest bar (directional movement confirms the trend direction)."""
+        import pandas as pd
+        from breakout_strategy import _adx
+        n = 60
+        closes = pd.Series([10.0 + i * 0.6 for i in range(n)])
+        highs = closes + 0.3
+        lows = closes - 0.1
+        adx, plus_di, minus_di = _adx(highs, lows, closes, 14)
+        assert plus_di.iloc[-1] > minus_di.iloc[-1]
+
+    def test_adx_strong_downtrend_minus_di_dominates(self):
+        """In a clean, strong downtrend, -DI should be greater than +DI on
+        the latest bar."""
+        import pandas as pd
+        from breakout_strategy import _adx
+        n = 60
+        closes = pd.Series([50.0 - i * 0.6 for i in range(n)])
+        highs = closes + 0.1
+        lows = closes - 0.3
+        adx, plus_di, minus_di = _adx(highs, lows, closes, 14)
+        assert minus_di.iloc[-1] > plus_di.iloc[-1]
+
+    def test_rsi_no_nan_after_warmup(self):
+        """RSI must never return NaN (fillna(50) safety net) — a NaN would
+        silently break the cond4 (RSI > threshold) comparison downstream."""
+        from breakout_strategy import _rsi
+        closes, _, _ = self._make_price_series()
+        rsi = _rsi(closes, 14)
+        assert not rsi.isna().any()
+
+    def test_adx_no_nan_after_warmup(self):
+        """ADX/+DI/-DI must never return NaN — a NaN would silently break
+        cond5 (+DI > -DI) and cond6 (ADX > threshold) downstream."""
+        from breakout_strategy import _adx
+        closes, highs, lows = self._make_price_series()
+        adx, plus_di, minus_di = _adx(highs, lows, closes, 14)
+        assert not adx.isna().any()
+        assert not plus_di.isna().any()
+        assert not minus_di.isna().any()
