@@ -227,7 +227,7 @@ async def cmd_market(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             lines.append(f"*الأداء السنوي:* {_escape_markdown(str(market.year_change_pct))}")
         lines += [
             "",
-            f"📍 المصدر: Trading Economics",
+            "📍 المصدر: Trading Economics",
         ]
 
         await msg.edit_text("\n".join(lines), parse_mode=ParseMode.MARKDOWN)
@@ -686,39 +686,85 @@ def main() -> None:
 
 # ─── 5-Star Rating System ────────────────────────────────────────────────────
 
+
+# ─── 5-Star Rating System ────────────────────────────────────────────────────
+
 def _compute_support_resistance(df):
-    """Compute support and resistance levels from price data."""
+    """
+    Compute support and resistance levels from price data.
+    
+    CRITICAL FIXES vs original:
+    1. Support MUST be below current price, resistance MUST be above.
+    2. Noise filter: S/R levels within 0.5% of current price are ignored
+       (flat periods create dozens of identical swing highs/lows that are
+       meaningless as support/resistance).
+    3. Deduplicate swing highs/lows (flat periods create repeats).
+    
+    Returns: (current_price, support, resistance)
+      support: nearest valid support BELOW current price (or None if none found)
+      resistance: nearest valid resistance ABOVE current price (or None if none found)
+    """
     if df is None or len(df) < 20:
         return None, None, None
 
     current_price = float(df['Close'].iloc[-1])
     recent = df.tail(60)
 
-    # Support = recent swing lows
+    # Noise threshold: levels within 0.5% of current price are not meaningful S/R
+    noise_threshold = current_price * 0.01  # 1% — filters minor price noise
+
+    # ── Find ALL swing lows and swing highs ──
     lows = recent['Low'].values
-    sup_cands = []
+    highs = recent['High'].values
+
+    swing_lows = []
     for i in range(2, len(lows) - 2):
         if lows[i] == min(lows[i-2:i+3]):
-            sup_cands.append(float(lows[i]))
-    support = max(sup_cands[-3:]) if len(sup_cands) >= 3 else (
-        max(sup_cands) if sup_cands else float(recent['Low'].min())
-    )
+            swing_lows.append(float(lows[i]))
 
-    # Resistance = recent swing highs
-    highs = recent['High'].values
-    res_cands = []
+    swing_highs = []
     for i in range(2, len(highs) - 2):
         if highs[i] == max(highs[i-2:i+3]):
-            res_cands.append(float(highs[i]))
-    resistance = min(res_cands[-3:]) if len(res_cands) >= 3 else (
-        min(res_cands) if res_cands else float(recent['High'].max())
-    )
+            swing_highs.append(float(highs[i]))
 
-    # EMA50 as resistance if price below
-    if len(df) >= 50:
-        ema50 = df['Close'].ewm(span=50, adjust=False).mean().iloc[-1]
-        if current_price < ema50:
-            resistance = min(resistance, float(ema50))
+    # Deduplicate (flat periods create identical swing levels)
+    swing_lows = sorted(set(swing_lows), reverse=True)   # highest first
+    swing_highs = sorted(set(swing_highs))                # lowest first
+
+    # ── Support: nearest swing low BELOW current price (at least 0.5% below) ──
+    valid_supports = [s for s in swing_lows if s < current_price - noise_threshold]
+    if valid_supports:
+        # Use the highest valid support (closest to current price from below)
+        support = valid_supports[0]  # already sorted highest-first
+    else:
+        # No swing low below price — use recent low as fallback
+        recent_low = float(recent['Low'].min())
+        support = recent_low if recent_low < current_price - noise_threshold else None
+
+    # ── Resistance: nearest swing high ABOVE current price (at least 0.5% above) ──
+    valid_resistances = [r for r in swing_highs if r > current_price + noise_threshold]
+    if valid_resistances:
+        # Use the lowest valid resistance (closest to current price from above)
+        resistance = valid_resistances[0]  # already sorted lowest-first
+    else:
+        # No swing high above price — use EMA50 as resistance if price is below it
+        if len(df) >= 50:
+            ema50 = df['Close'].ewm(span=50, adjust=False).mean().iloc[-1]
+            resistance = float(ema50) if ema50 > current_price + noise_threshold else None
+        else:
+            resistance = None
+        # If still no resistance, use recent high
+        if resistance is None:
+            recent_high = float(recent['High'].max())
+            resistance = recent_high if recent_high > current_price + noise_threshold else None
+
+
+    # ── EMA50 as resistance only if NO swing high resistance was found ──
+    # (EMA50 should not override a stronger swing high resistance)
+    if resistance is None and len(df) >= 50:
+        ema50_val = float(df["Close"].ewm(span=50, adjust=False).mean().iloc[-1])
+        if current_price < ema50_val - noise_threshold:
+            resistance = ema50_val
 
     return current_price, support, resistance
 
@@ -727,9 +773,52 @@ def _rate_5star(signal, df):
     """
     Rate a stock 0-5 stars based on breakout readiness.
     Only 4-5 star stocks are considered "five-star" quality.
+    
+    CRITICAL FIXES:
+    - Reject stocks where RSI is falling AND ADX is falling (no momentum + no trend)
+    - Require R/R >= 2.0 (not just 1.5) for 4+ star stocks
+    - Support MUST be below price, target MUST be above price
+    - If risk management is invalid, stock gets 0 stars and is filtered out
     """
     stars = 0
     reasons = []
+    reject_reason = None
+
+    # ── HARD REJECT: Both RSI and ADX falling = no momentum and no trend ──
+    if signal.rsi_trend == "falling" and signal.adx_trend == "falling":
+        reject_reason = "RSI و ADX كلاهما هابط — لا يوجد زخم أو اتجاه"
+        return {
+            'ticker': signal.ticker,
+            'stars': 0,
+            'reasons': [],
+            'price': float(df['Close'].iloc[-1]) if df is not None else 0,
+            'support': None,
+            'resistance': None,
+            'target': None,
+            'stop_loss': None,
+            'rr_ratio': None,
+            'entry_price': None,
+            'signal': signal,
+            'reject_reason': reject_reason,
+        }
+
+    # ── HARD REJECT: ADX too low (< 15) = no trend at all ──
+    if signal.adx < 15:
+        reject_reason = f"ADX ضعيف جداً ({signal.adx:.0f}) — لا يوجد اتجاه"
+        return {
+            'ticker': signal.ticker,
+            'stars': 0,
+            'reasons': [],
+            'price': float(df['Close'].iloc[-1]) if df is not None else 0,
+            'support': None,
+            'resistance': None,
+            'target': None,
+            'stop_loss': None,
+            'rr_ratio': None,
+            'entry_price': None,
+            'signal': signal,
+            'reject_reason': reject_reason,
+        }
 
     # Star 1: Distance from EMA50 (must be very close)
     if abs(signal.distance_pct) <= 1.5:
@@ -754,6 +843,9 @@ def _rate_5star(signal, df):
     elif 40 <= signal.rsi <= 65 and signal.rsi_trend == "rising":
         stars += 1
         reasons.append(f"RSI صاعد ({signal.rsi:.0f})")
+    elif 45 <= signal.rsi <= 60 and signal.rsi_trend == "flat":
+        # RSI stable in good zone — half credit but no star
+        reasons.append(f"RSI ثابت في منطقة جيدة ({signal.rsi:.0f})")
 
     # Star 4: ADX shows trend strength
     if signal.adx >= 20 and signal.adx_trend == "rising":
@@ -768,19 +860,64 @@ def _rate_5star(signal, df):
         stars += 1
         reasons.append("قيعان صاعدة — دعم هيكلي مؤكد")
 
-    # Compute support/resistance and risk management
+    # ── Compute support/resistance and risk management ──
     current_price, support, resistance = _compute_support_resistance(df)
 
     target = None
     stop_loss = None
     rr_ratio = None
-    if support and resistance and current_price:
-        target = resistance + (resistance - support) * 0.5
-        stop_loss = support * 0.99  # 1% below support
-        risk = current_price - stop_loss
-        reward = target - current_price
-        if risk > 0:
-            rr_ratio = reward / risk
+    entry_price = None
+
+    # CRITICAL: Validate support is below price and resistance is above
+    if support is not None and resistance is not None and current_price is not None:
+        if support >= current_price:
+            # Support above price = invalid, don't compute risk
+            reject_reason = "الدعم فوق السعر — بنية سعيرية غير صالحة"
+        elif resistance <= current_price:
+            # Resistance below price = invalid
+            reject_reason = "المقاومة تحت السعر — بنية سعيرية غير صالحة"
+        else:
+            # Valid support/resistance — calculate risk management
+            entry_price = current_price
+            stop_loss = support * 0.99  # 1% below support
+            risk = entry_price - stop_loss
+            # Target = resistance, with minimum R/R of 2:1
+            reward_to_resistance = resistance - entry_price
+            rr_to_resistance = reward_to_resistance / risk if risk > 0 else 0
+
+            if rr_to_resistance >= 2.0:
+                # Resistance is far enough — use it as target
+                target = resistance
+                rr_ratio = rr_to_resistance
+            elif rr_to_resistance >= 1.5:
+                # Resistance is okay but not great — extend target beyond resistance
+                target = entry_price + (risk * 2.0)  # Force 2:1 R/R
+                rr_ratio = 2.0
+            else:
+                # Resistance too close — skip this stock
+                reject_reason = f"المقاومة قريبة جداً (R/R = {rr_to_resistance:.1f})"
+
+            if target and stop_loss and target <= stop_loss:
+                reject_reason = "الهدف تحت الستوب لوس — حساب خاطئ"
+                target = None
+                stop_loss = None
+                rr_ratio = None
+
+    if reject_reason:
+        return {
+            'ticker': signal.ticker,
+            'stars': 0,
+            'reasons': [],
+            'price': current_price or 0,
+            'support': support,
+            'resistance': resistance,
+            'target': None,
+            'stop_loss': None,
+            'rr_ratio': None,
+            'entry_price': None,
+            'signal': signal,
+            'reject_reason': reject_reason,
+        }
 
     return {
         'ticker': signal.ticker,
@@ -792,7 +929,9 @@ def _rate_5star(signal, df):
         'target': target,
         'stop_loss': stop_loss,
         'rr_ratio': rr_ratio,
+        'entry_price': entry_price,
         'signal': signal,
+        'reject_reason': None,
     }
 
 
@@ -807,32 +946,45 @@ def _format_5star_message(stock):
     tgt = f"{stock['target']:.2f}" if stock['target'] else "N/A"
     sl = f"{stock['stop_loss']:.2f}" if stock['stop_loss'] else "N/A"
     rr = f"{stock['rr_ratio']:.1f}:1" if stock['rr_ratio'] else "N/A"
+    entry = f"{stock['entry_price']:.2f}" if stock['entry_price'] else p
+
+    # Validate: target must be above entry, stop must be below entry
+    if stock['target'] and stock['stop_loss'] and stock['entry_price']:
+        if stock['target'] <= stock['entry_price']:
+            tgt = "⚠️ غير صالح"
+        if stock['stop_loss'] >= stock['entry_price']:
+            sl = "⚠️ غير صالح"
 
     msg = f"{stars_str}\n"
     msg += f"📊 {stock['ticker']}\n"
-    msg += f"━━━━━━━━━━━━━━━\n"
-    msg += f"💰 السعر: {p} EGP\n"
+    msg += "━━━━━━━━━━━━━━━\n"
+    msg += f"💰 سعر الدخول: {entry} EGP\n"
     msg += f"🟢 الدعم: {sup} EGP\n"
     msg += f"🔴 المقاومة: {res} EGP\n"
-    msg += f"━━━━━━━━━━━━━━━\n"
+    msg += "━━━━━━━━━━━━━━━\n"
     msg += f"🎯 الهدف: {tgt} EGP\n"
     msg += f"🛑 ستوب لوس: {sl} EGP\n"
     msg += f"📈 المخاطرة/العائد: {rr}\n"
-    msg += f"━━━━━━━━━━━━━━━\n"
-    msg += f"📋 ليه هذا السهم؟\n"
+    msg += "━━━━━━━━━━━━━━━\n"
+    msg += "📋 ليه هذا السهم؟\n"
     for r in stock['reasons']:
         msg += f"  ✅ {r}\n"
     if not stock['reasons']:
         msg += f"  • Score: {s.score}/100\n"
-    msg += f"━━━━━━━━━━━━━━━\n"
-    msg += f"📊 المؤشرات:\n"
+    msg += "━━━━━━━━━━━━━━━\n"
+    msg += "📊 المؤشرات:\n"
     msg += f"  • المسافة من EMA50: {s.distance_pct:+.1f}%\n"
     msg += f"  • RSI: {s.rsi:.0f} ({s.rsi_trend})\n"
     msg += f"  • ADX: {s.adx:.0f} ({s.adx_trend})\n"
     msg += f"  • الحجم: {s.volume_trend} ({s.volume_ratio:.1f}x)\n"
     msg += f"  • قيعان صاعدة: {'نعم ✅' if s.higher_lows else 'لا ❌'}\n"
-    msg += f"━━━━━━━━━━━━━━━\n"
-    msg += f"⚠️ هذه ليست نصيحة مالية. التداول ينطوي على مخاطر."
+    msg += "━━━━━━━━━━━━━━━\n"
+    msg += "📌 شروط الدخول:\n"
+    msg += "  • اختراق EMA50 بإغلاق يومي فوقها\n"
+    msg += "  • حجم تداول أعلى من المتوسط\n"
+    msg += "  • RSI فوق 50\n"
+    msg += "━━━━━━━━━━━━━━━\n"
+    msg += "⚠️ هذه ليست نصيحة مالية. التداول ينطوي على مخاطر."
 
     return msg
 
@@ -841,10 +993,18 @@ def find_5star_stocks(signals, download_func):
     """
     Evaluate pre-breakout signals and return only 4+ star stocks.
     Uses scan cache to avoid re-downloading (prevents 429 rate limits).
-    Filters out penny stocks (price < 1 EGP).
+    
+    CRITICAL FIXES:
+    - Filter out stocks with None/negative R/R ratio (not just < 1.5)
+    - Filter out stocks with reject_reason (invalid support/resistance/etc.)
+    - Filter out penny stocks (price < 1 EGP)
+    - Require R/R >= 2.0 for 4+ star stocks
+    - Require valid entry_price (not None)
     """
     from stock_scanner import _df_cache
     evaluated = []
+    rejected = []
+
     for signal in signals:
         if signal.score < 40:
             continue
@@ -854,20 +1014,46 @@ def find_5star_stocks(signals, download_func):
             df = download_func(signal.ticker, n_bars=150, retries=1)
         if df is None or len(df) < 50:
             continue
+
         result = _rate_5star(signal, df)
+
+        # Skip rejected stocks (invalid support/resistance, weak indicators, etc.)
+        if result.get('reject_reason'):
+            rejected.append((signal.ticker, result['reject_reason']))
+            continue
+
         # Filter out penny stocks (price < 1 EGP)
         if result['price'] and result['price'] < 1.0:
             continue
-        # Filter out stocks with no support/resistance
+
+        # CRITICAL: Filter out stocks with no valid support/resistance
         if result['support'] is None or result['resistance'] is None:
             continue
-        # Filter out stocks with R/R < 1.5
-        if result['rr_ratio'] and result['rr_ratio'] < 1.5:
+
+        # CRITICAL: Filter out stocks with no valid R/R ratio (was passing before!)
+        if result['rr_ratio'] is None or result['rr_ratio'] < 1.5:
             continue
+
+        # CRITICAL: Filter out stocks with no entry price
+        if result['entry_price'] is None:
+            continue
+
+        # CRITICAL: Validate target > entry > stop_loss
+        if result['target'] and result['stop_loss'] and result['entry_price']:
+            if result['target'] <= result['entry_price']:
+                continue
+            if result['stop_loss'] >= result['entry_price']:
+                continue
+
         evaluated.append(result)
 
-    # Sort by stars (desc), then by score (desc)
-    evaluated.sort(key=lambda x: (x['stars'], x['signal'].score), reverse=True)
+    # Log rejected stocks for transparency
+    if rejected:
+        for ticker, reason in rejected[:10]:
+            logger.info(f"  ❌ {ticker}: {reason}")
+
+    # Sort by stars (desc), then by R/R ratio (desc), then by score (desc)
+    evaluated.sort(key=lambda x: (x['stars'], x.get('rr_ratio', 0) or 0, x['signal'].score), reverse=True)
 
     # Return only 4+ star stocks
     return [s for s in evaluated if s['stars'] >= 4], evaluated

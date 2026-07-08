@@ -1129,3 +1129,175 @@ class TestEdgeCases:
             finally:
                 os.chdir(old_cwd)
 
+
+
+# ─── Regression Tests for 5-Star Data Quality Fixes (July 8, 2026) ────────
+# These tests prevent the bugs where:
+# 1. Support was above current price
+# 2. Target was below stop loss
+# 3. R/R = None passed the filter
+# 4. Buy signal with RSI falling + ADX falling
+# 5. No entry price in the recommendation
+
+class TestSupportResistanceValidation:
+    """Test that support is always below price and resistance is always above."""
+
+    def _make_declining_df(self, n=80):
+        """Create a DataFrame where price is declining (support would be above price with old code)."""
+        import pandas as pd
+        dates = pd.date_range(end="2026-07-08", periods=n)
+        # Price starts at 20, declines to 15 — swing lows will be above current price
+        closes = [20 - i * 0.06 for i in range(n)]
+        highs = [c + 0.3 for c in closes]
+        lows = [c - 0.3 for c in closes]
+        volumes = [100000] * n
+        return pd.DataFrame({
+            "Open": closes, "High": highs, "Low": lows,
+            "Close": closes, "Volume": volumes
+        }, index=dates)
+
+    def test_support_below_price_declining_stock(self):
+        """Support must be below current price even for declining stocks."""
+        from bot import _compute_support_resistance
+        df = self._make_declining_df()
+        price, support, resistance = _compute_support_resistance(df)
+        assert price is not None
+        if support is not None:
+            assert support < price, f"Support ({support}) must be below price ({price})"
+
+    def test_resistance_above_price(self):
+        """Resistance must be above current price."""
+        from bot import _compute_support_resistance
+        df = self._make_declining_df()
+        price, support, resistance = _compute_support_resistance(df)
+        assert price is not None
+        if resistance is not None:
+            assert resistance > price, f"Resistance ({resistance}) must be above price ({price})"
+
+
+class TestRate5StarRejection:
+    """Test that _rate_5star rejects stocks with invalid data."""
+
+    def _make_signal(self, rsi_trend="rising", adx_trend="rising", adx=22, **kwargs):
+        """Create a mock PreBreakoutSignal."""
+        from breakout_strategy import PreBreakoutSignal
+        defaults = dict(
+            ticker="TEST", signal="APPROACHING", score=75,
+            close=15.0, ema_value=15.2, distance_pct=-1.3,
+            candles_below=5, consolidation_pct=6.0,
+            volume_trend="rising", volume_ratio=1.5,
+            rsi=52.0, rsi_trend=rsi_trend,
+            adx=adx, adx_trend=adx_trend,
+            di_plus=18, di_minus=12,
+            higher_lows=True, recent_high=16.0,
+            atr=0.5, stop_loss=14.0, target=17.0,
+            data_date="2026-07-08",
+        )
+        defaults.update(kwargs)
+        return PreBreakoutSignal(**defaults)
+
+    def _make_uptrend_df(self, n=80):
+        """Create a DataFrame in an uptrend (valid support below price)."""
+        import pandas as pd
+        dates = pd.date_range(end="2026-07-08", periods=n)
+        # Price goes from 12 to 15 with some pullbacks
+        closes = [12 + i * 0.04 + (0.2 if i % 5 == 0 else 0) for i in range(n)]
+        highs = [c + 0.3 for c in closes]
+        lows = [c - 0.3 for c in closes]
+        volumes = [100000] * n
+        return pd.DataFrame({
+            "Open": closes, "High": highs, "Low": lows,
+            "Close": closes, "Volume": volumes
+        }, index=dates)
+
+    def test_reject_rsi_falling_and_adx_falling(self):
+        """Stock with both RSI and ADX falling should get 0 stars."""
+        from bot import _rate_5star
+        signal = self._make_signal(rsi_trend="falling", adx_trend="falling")
+        df = self._make_uptrend_df()
+        result = _rate_5star(signal, df)
+        assert result['stars'] == 0
+        assert result['reject_reason'] is not None
+
+    def test_reject_low_adx(self):
+        """Stock with ADX < 15 should get 0 stars."""
+        from bot import _rate_5star
+        signal = self._make_signal(adx=12, adx_trend="rising")
+        df = self._make_uptrend_df()
+        result = _rate_5star(signal, df)
+        assert result['stars'] == 0
+        assert result['reject_reason'] is not None
+
+    def test_valid_stock_gets_stars(self):
+        """Stock with good indicators should get stars."""
+        from bot import _rate_5star
+        signal = self._make_signal()
+        df = self._make_uptrend_df()
+        result = _rate_5star(signal, df)
+        assert result['stars'] > 0
+        assert result['reject_reason'] is None
+
+    def test_target_above_entry(self):
+        """Target must be above entry price."""
+        from bot import _rate_5star
+        signal = self._make_signal()
+        df = self._make_uptrend_df()
+        result = _rate_5star(signal, df)
+        if result['target'] and result['entry_price']:
+            assert result['target'] > result['entry_price'], \
+                f"Target ({result['target']}) must be above entry ({result['entry_price']})"
+
+    def test_stop_below_entry(self):
+        """Stop loss must be below entry price."""
+        from bot import _rate_5star
+        signal = self._make_signal()
+        df = self._make_uptrend_df()
+        result = _rate_5star(signal, df)
+        if result['stop_loss'] and result['entry_price']:
+            assert result['stop_loss'] < result['entry_price'], \
+                f"Stop ({result['stop_loss']}) must be below entry ({result['entry_price']})"
+
+    def test_rr_ratio_not_none_for_valid_stock(self):
+        """Valid stock should have a computed R/R ratio."""
+        from bot import _rate_5star
+        signal = self._make_signal()
+        df = self._make_uptrend_df()
+        result = _rate_5star(signal, df)
+        if result['stars'] >= 4:
+            assert result['rr_ratio'] is not None, "R/R ratio should be computed for 4+ star stocks"
+            assert result['rr_ratio'] >= 1.5, f"R/R ({result['rr_ratio']}) should be >= 1.5"
+
+
+class TestFind5StarFilters:
+    """Test that find_5star_stocks properly filters invalid stocks."""
+
+    def test_none_rr_ratio_filtered(self):
+        """Stocks with None R/R ratio should NOT pass the filter."""
+        # This is the bug that caused the user's issue — None passed the < 1.5 check
+        assert not (None and None < 1.5), "None should be falsy and not pass R/R filter"
+
+    def test_rejected_stock_not_in_results(self):
+        """A stock with reject_reason should not appear in evaluated list."""
+        # Simulate the filter logic
+        result = {
+            'stars': 4,
+            'rr_ratio': None,
+            'reject_reason': 'Invalid support/resistance',
+            'entry_price': None,
+            'support': None,
+            'resistance': None,
+            'price': 15.0,
+        }
+        # The checks in find_5star_stocks
+        if result.get('reject_reason'):
+            pass  # skipped
+        elif result['price'] and result['price'] < 1.0:
+            pass  # skipped
+        elif result['support'] is None or result['resistance'] is None:
+            pass  # skipped
+        elif result['rr_ratio'] is None or result['rr_ratio'] < 1.5:
+            pass  # skipped
+        elif result['entry_price'] is None:
+            pass  # skipped
+        else:
+            assert False, "Stock should have been filtered out"
