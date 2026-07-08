@@ -1197,14 +1197,33 @@ class TestRate5StarRejection:
         return PreBreakoutSignal(**defaults)
 
     def _make_uptrend_df(self, n=80):
-        """Create a DataFrame in an uptrend (valid support below price)."""
+        """Create a DataFrame with clear resistance far above current price.
+        Stock spiked to 22, crashed to 14, now consolidating at 15 (pre-breakout).
+        Support ~14.7, Resistance ~22.3, R/R ~17:1."""
         import pandas as pd
+        import numpy as np
+        np.random.seed(42)
         dates = pd.date_range(end="2026-07-08", periods=n)
-        # Price goes from 12 to 15 with some pullbacks
-        closes = [12 + i * 0.04 + (0.2 if i % 5 == 0 else 0) for i in range(n)]
-        highs = [c + 0.3 for c in closes]
-        lows = [c - 0.3 for c in closes]
-        volumes = [100000] * n
+        closes = []
+        highs = []
+        lows = []
+        for i in range(n):
+            if i < 25:
+                c = 15.0 + np.random.uniform(-0.05, 0.05)
+                closes.append(c); highs.append(c+0.1); lows.append(c-0.1)
+            elif i < 35:
+                c = 15.0 + (i-25) * 0.7  # spike to 22
+                closes.append(c); highs.append(c+0.8); lows.append(c-0.3)
+            elif i < 45:
+                c = 22.0 - (i-35) * 0.8  # crash to 14
+                closes.append(c); highs.append(c+0.3); lows.append(c-0.3)
+            elif i < 60:
+                c = 14.0 + np.random.uniform(0, 0.3)  # consolidation
+                closes.append(c); highs.append(c+0.1); lows.append(c-0.1)
+            else:
+                c = 15.0 + np.random.uniform(-0.05, 0.02)  # tight base
+                closes.append(c); highs.append(c+0.05); lows.append(c-0.05)
+        volumes = [80000 + i * 1000 for i in range(n)]
         return pd.DataFrame({
             "Open": closes, "High": highs, "Low": lows,
             "Close": closes, "Volume": volumes
