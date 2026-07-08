@@ -1,0 +1,51 @@
+[
+  {
+    "ticker": "ELKA",
+    "original_price": 1.33,
+    "price_7d": 1.39,
+    "pnl_pct_7d": 4.51,
+    "result_7d": "Win"
+  },
+  {
+    "ticker": "AJWA",
+    "original_price": 179.69,
+    "price_7d": 176.5,
+    "pnl_pct_7d": -1.78,
+    "result_7d": "Neutral"
+  },
+  {
+    "ticker": "ENGC",
+    "original_price": 37.0,
+    "price_7d": 38.2,
+    "pnl_pct_7d": 3.24,
+    "result_7d": "Win"
+  },
+  {
+    "ticker": "ISMA",
+    "original_price": 28.69,
+    "price_7d": 28.15,
+    "pnl_pct_7d": -1.88,
+    "result_7d": "Neutral"
+  },
+  {
+    "ticker": "HDBK",
+    "original_price": 158.96,
+    "price_7d": 164.5,
+    "pnl_pct_7d": 3.49,
+    "result_7d": "Win"
+  },
+  {
+    "ticker": "CLHO",
+    "original_price": 16.75,
+    "price_7d": 17.2,
+    "pnl_pct_7d": 2.69,
+    "result_7d": "Win"
+  },
+  {
+    "ticker": "OCDI",
+    "original_price": 24.78,
+    "price_7d": 24.3,
+    "pnl_pct_7d": -1.94,
+    "result_7d": "Neutral"
+  }
+]
