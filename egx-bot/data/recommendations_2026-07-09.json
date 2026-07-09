@@ -1,0 +1,93 @@
+{
+  "report_date": "2026-07-09",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "CPME",
+      "score": 47,
+      "price": 18.0,
+      "type": "ACCUMULATING",
+      "distance_pct": 3.3,
+      "ema_value": 18.61,
+      "consolidation_pct": 26.56,
+      "volume_trend": "rising",
+      "rsi": 45.0,
+      "adx": 39.3,
+      "higher_lows": false,
+      "stop_loss": 0,
+      "target": 0
+    },
+    {
+      "ticker": "SKPC",
+      "score": 73,
+      "price": 16.55,
+      "type": "APPROACHING",
+      "distance_pct": 0.69,
+      "ema_value": 16.67,
+      "consolidation_pct": 11.12,
+      "volume_trend": "flat",
+      "rsi": 52.6,
+      "adx": 15.1,
+      "higher_lows": false,
+      "stop_loss": 15.41,
+      "target": 17.81
+    },
+    {
+      "ticker": "OIH",
+      "score": 68,
+      "price": 1.42,
+      "type": "ACCUMULATING",
+      "distance_pct": -0.31,
+      "ema_value": 1.42,
+      "consolidation_pct": 7.04,
+      "volume_trend": "flat",
+      "rsi": 51.1,
+      "adx": 18.0,
+      "higher_lows": false,
+      "stop_loss": 0,
+      "target": 0
+    },
+    {
+      "ticker": "DGTZ",
+      "score": 50,
+      "price": 2.58,
+      "type": "ACCUMULATING",
+      "distance_pct": 4.93,
+      "ema_value": 2.71,
+      "consolidation_pct": 13.57,
+      "volume_trend": "flat",
+      "rsi": 46.7,
+      "adx": 22.2,
+      "higher_lows": false,
+      "stop_loss": 0,
+      "target": 0
+    },
+    {
+      "ticker": "SAUD",
+      "score": 45,
+      "price": 21.06,
+      "type": "ACCUMULATING",
+      "distance_pct": 2.1,
+      "ema_value": 21.51,
+      "consolidation_pct": 10.68,
+      "volume_trend": "falling",
+      "rsi": 44.0,
+      "adx": 21.1,
+      "higher_lows": false,
+      "stop_loss": 0,
+      "target": 0
+    }
+  ],
+  "current_prices": {
+    "CPME": 18.0,
+    "SKPC": 16.55,
+    "OIH": 1.42,
+    "DGTZ": 2.58,
+    "SAUD": 21.06
+  },
+  "total_recommendations": 5,
+  "approaching_count": 1,
+  "accumulating_count": 4,
+  "buy_count": 0,
+  "wait_count": 0
+}
