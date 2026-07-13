@@ -1,0 +1,61 @@
+{
+  "report_date": "2026-07-13",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "EFIC",
+      "score": 45,
+      "price": 184.95,
+      "type": "ACCUMULATING",
+      "distance_pct": 7.52,
+      "ema_value": 199.99,
+      "consolidation_pct": 14.99,
+      "volume_trend": "rising",
+      "rsi": 31.6,
+      "adx": 56.8,
+      "higher_lows": true,
+      "stop_loss": 0,
+      "target": 0
+    },
+    {
+      "ticker": "EGAL",
+      "score": 60,
+      "price": 293.03,
+      "type": "ACCUMULATING",
+      "distance_pct": 1.88,
+      "ema_value": 298.65,
+      "consolidation_pct": 14.58,
+      "volume_trend": "falling",
+      "rsi": 45.5,
+      "adx": 19.6,
+      "higher_lows": true,
+      "stop_loss": 0,
+      "target": 0
+    },
+    {
+      "ticker": "OIH",
+      "score": 68,
+      "price": 1.42,
+      "type": "ACCUMULATING",
+      "distance_pct": -0.33,
+      "ema_value": 1.42,
+      "consolidation_pct": 5.63,
+      "volume_trend": "flat",
+      "rsi": 51.2,
+      "adx": 17.2,
+      "higher_lows": false,
+      "stop_loss": 0,
+      "target": 0
+    }
+  ],
+  "current_prices": {
+    "EFIC": 184.95,
+    "EGAL": 293.03,
+    "OIH": 1.42
+  },
+  "total_recommendations": 3,
+  "approaching_count": 0,
+  "accumulating_count": 3,
+  "buy_count": 0,
+  "wait_count": 0
+}
