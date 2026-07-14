@@ -1,0 +1,45 @@
+{
+  "report_date": "2026-07-14",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "EFIC",
+      "score": 60,
+      "price": 195.5,
+      "type": "ACCUMULATING",
+      "distance_pct": 2.21,
+      "ema_value": 199.91,
+      "consolidation_pct": 16.87,
+      "volume_trend": "rising",
+      "rsi": 52.0,
+      "adx": 51.6,
+      "higher_lows": true,
+      "stop_loss": 0,
+      "target": 0
+    },
+    {
+      "ticker": "MCQE",
+      "score": 75,
+      "price": 176.1,
+      "type": "APPROACHING",
+      "distance_pct": 2.56,
+      "ema_value": 180.72,
+      "consolidation_pct": 8.71,
+      "volume_trend": "rising",
+      "rsi": 46.0,
+      "adx": 21.9,
+      "higher_lows": true,
+      "stop_loss": 164.47,
+      "target": 192.35
+    }
+  ],
+  "current_prices": {
+    "EFIC": 195.5,
+    "MCQE": 176.1
+  },
+  "total_recommendations": 2,
+  "approaching_count": 1,
+  "accumulating_count": 1,
+  "buy_count": 0,
+  "wait_count": 0
+}
