@@ -1,0 +1,45 @@
+{
+  "report_date": "2026-07-16",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "ABUK",
+      "score": 80,
+      "price": 73.7,
+      "type": "APPROACHING",
+      "distance_pct": 1.95,
+      "ema_value": 75.16,
+      "consolidation_pct": 9.62,
+      "volume_trend": "rising",
+      "rsi": 52.8,
+      "adx": 25.8,
+      "higher_lows": true,
+      "stop_loss": 65.61,
+      "target": 83.25
+    },
+    {
+      "ticker": "EFIC",
+      "score": 55,
+      "price": 187.13,
+      "type": "ACCUMULATING",
+      "distance_pct": 5.94,
+      "ema_value": 198.94,
+      "consolidation_pct": 17.62,
+      "volume_trend": "rising",
+      "rsi": 41.2,
+      "adx": 47.0,
+      "higher_lows": true,
+      "stop_loss": 0,
+      "target": 0
+    }
+  ],
+  "current_prices": {
+    "ABUK": 73.7,
+    "EFIC": 187.13
+  },
+  "total_recommendations": 2,
+  "approaching_count": 1,
+  "accumulating_count": 1,
+  "buy_count": 0,
+  "wait_count": 0
+}
