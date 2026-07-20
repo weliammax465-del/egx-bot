@@ -1,0 +1,29 @@
+{
+  "report_date": "2026-07-20",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "ABUK",
+      "score": 65,
+      "price": 72.89,
+      "type": "ACCUMULATING",
+      "distance_pct": 2.88,
+      "ema_value": 75.05,
+      "consolidation_pct": 12.25,
+      "volume_trend": "rising",
+      "rsi": 50.0,
+      "adx": 24.4,
+      "higher_lows": true,
+      "stop_loss": 0,
+      "target": 0
+    }
+  ],
+  "current_prices": {
+    "ABUK": 72.89
+  },
+  "total_recommendations": 1,
+  "approaching_count": 0,
+  "accumulating_count": 1,
+  "buy_count": 0,
+  "wait_count": 0
+}
