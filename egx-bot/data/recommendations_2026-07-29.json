@@ -1,0 +1,29 @@
+{
+  "report_date": "2026-07-29",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "EFIC",
+      "score": 60,
+      "price": 189.97,
+      "type": "ACCUMULATING",
+      "distance_pct": 2.88,
+      "ema_value": 195.6,
+      "consolidation_pct": 17.36,
+      "volume_trend": "rising",
+      "rsi": 49.4,
+      "adx": 34.0,
+      "higher_lows": true,
+      "stop_loss": 0,
+      "target": 0
+    }
+  ],
+  "current_prices": {
+    "EFIC": 189.97
+  },
+  "total_recommendations": 1,
+  "approaching_count": 0,
+  "accumulating_count": 1,
+  "buy_count": 0,
+  "wait_count": 0
+}
