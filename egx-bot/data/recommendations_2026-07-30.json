@@ -1,0 +1,29 @@
+{
+  "report_date": "2026-07-30",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "MCQE",
+      "score": 75,
+      "price": 180.3,
+      "type": "APPROACHING",
+      "distance_pct": 0.99,
+      "ema_value": 182.1,
+      "consolidation_pct": 13.87,
+      "volume_trend": "rising",
+      "rsi": 47.7,
+      "adx": 21.3,
+      "higher_lows": true,
+      "stop_loss": 167.5,
+      "target": 194.9
+    }
+  ],
+  "current_prices": {
+    "MCQE": 180.3
+  },
+  "total_recommendations": 1,
+  "approaching_count": 1,
+  "accumulating_count": 0,
+  "buy_count": 0,
+  "wait_count": 0
+}
