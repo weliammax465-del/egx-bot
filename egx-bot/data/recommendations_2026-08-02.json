@@ -1,0 +1,45 @@
+{
+  "report_date": "2026-08-02",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "JUFO",
+      "score": 55,
+      "price": 28.8,
+      "type": "ACCUMULATING",
+      "distance_pct": 2.02,
+      "ema_value": 29.39,
+      "consolidation_pct": 11.7,
+      "volume_trend": "rising",
+      "rsi": 41.5,
+      "adx": 16.9,
+      "higher_lows": false,
+      "stop_loss": 0,
+      "target": 0
+    },
+    {
+      "ticker": "MOIN",
+      "score": 55,
+      "price": 23.44,
+      "type": "ACCUMULATING",
+      "distance_pct": 1.72,
+      "ema_value": 23.85,
+      "consolidation_pct": 7.38,
+      "volume_trend": "falling",
+      "rsi": 45.1,
+      "adx": 18.2,
+      "higher_lows": true,
+      "stop_loss": 0,
+      "target": 0
+    }
+  ],
+  "current_prices": {
+    "JUFO": 28.8,
+    "MOIN": 23.44
+  },
+  "total_recommendations": 2,
+  "approaching_count": 0,
+  "accumulating_count": 2,
+  "buy_count": 0,
+  "wait_count": 0
+}
