@@ -1,0 +1,45 @@
+{
+  "report_date": "2026-08-04",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "EFIC",
+      "score": 48,
+      "price": 192.01,
+      "type": "ACCUMULATING",
+      "distance_pct": 1.96,
+      "ema_value": 195.86,
+      "consolidation_pct": 17.15,
+      "volume_trend": "flat",
+      "rsi": 50.0,
+      "adx": 36.6,
+      "higher_lows": false,
+      "stop_loss": 0,
+      "target": 0
+    },
+    {
+      "ticker": "IRON",
+      "score": 53,
+      "price": 31.5,
+      "type": "ACCUMULATING",
+      "distance_pct": 1.23,
+      "ema_value": 31.89,
+      "consolidation_pct": 8.13,
+      "volume_trend": "flat",
+      "rsi": 49.9,
+      "adx": 23.0,
+      "higher_lows": false,
+      "stop_loss": 0,
+      "target": 0
+    }
+  ],
+  "current_prices": {
+    "EFIC": 192.01,
+    "IRON": 31.5
+  },
+  "total_recommendations": 2,
+  "approaching_count": 0,
+  "accumulating_count": 2,
+  "buy_count": 0,
+  "wait_count": 0
+}
