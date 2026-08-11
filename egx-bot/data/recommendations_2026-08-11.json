@@ -1,0 +1,29 @@
+{
+  "report_date": "2026-08-11",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "IRON",
+      "score": 70,
+      "price": 31.52,
+      "type": "APPROACHING",
+      "distance_pct": 1.6,
+      "ema_value": 32.03,
+      "consolidation_pct": 15.39,
+      "volume_trend": "rising",
+      "rsi": 47.6,
+      "adx": 22.5,
+      "higher_lows": false,
+      "stop_loss": 29.6,
+      "target": 33.96
+    }
+  ],
+  "current_prices": {
+    "IRON": 31.52
+  },
+  "total_recommendations": 1,
+  "approaching_count": 1,
+  "accumulating_count": 0,
+  "buy_count": 0,
+  "wait_count": 0
+}
