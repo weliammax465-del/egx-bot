@@ -1,0 +1,45 @@
+{
+  "report_date": "2026-08-18",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "IRON",
+      "score": 60,
+      "price": 31.16,
+      "type": "ACCUMULATING",
+      "distance_pct": 2.19,
+      "ema_value": 31.86,
+      "consolidation_pct": 15.56,
+      "volume_trend": "rising",
+      "rsi": 46.2,
+      "adx": 16.3,
+      "higher_lows": false,
+      "stop_loss": 0,
+      "target": 0
+    },
+    {
+      "ticker": "GBCO",
+      "score": 63,
+      "price": 30.4,
+      "type": "ACCUMULATING",
+      "distance_pct": 0.23,
+      "ema_value": 30.47,
+      "consolidation_pct": 11.41,
+      "volume_trend": "flat",
+      "rsi": 44.8,
+      "adx": 15.1,
+      "higher_lows": true,
+      "stop_loss": 0,
+      "target": 0
+    }
+  ],
+  "current_prices": {
+    "IRON": 31.16,
+    "GBCO": 30.4
+  },
+  "total_recommendations": 2,
+  "approaching_count": 0,
+  "accumulating_count": 2,
+  "buy_count": 0,
+  "wait_count": 0
+}
