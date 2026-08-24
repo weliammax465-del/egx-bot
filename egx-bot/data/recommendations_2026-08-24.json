@@ -1,0 +1,61 @@
+{
+  "report_date": "2026-08-24",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "IRON",
+      "score": 45,
+      "price": 30.9,
+      "type": "ACCUMULATING",
+      "distance_pct": 2.93,
+      "ema_value": 31.83,
+      "consolidation_pct": 15.7,
+      "volume_trend": "rising",
+      "rsi": 44.9,
+      "adx": 17.8,
+      "higher_lows": false,
+      "stop_loss": 0,
+      "target": 0
+    },
+    {
+      "ticker": "EGTS",
+      "score": 65,
+      "price": 17.47,
+      "type": "ACCUMULATING",
+      "distance_pct": 0.56,
+      "ema_value": 17.57,
+      "consolidation_pct": 26.22,
+      "volume_trend": "rising",
+      "rsi": 44.8,
+      "adx": 16.2,
+      "higher_lows": false,
+      "stop_loss": 0,
+      "target": 0
+    },
+    {
+      "ticker": "RAYA",
+      "score": 48,
+      "price": 7.12,
+      "type": "ACCUMULATING",
+      "distance_pct": 2.56,
+      "ema_value": 7.31,
+      "consolidation_pct": 9.97,
+      "volume_trend": "flat",
+      "rsi": 41.2,
+      "adx": 22.6,
+      "higher_lows": false,
+      "stop_loss": 0,
+      "target": 0
+    }
+  ],
+  "current_prices": {
+    "IRON": 30.9,
+    "EGTS": 17.47,
+    "RAYA": 7.12
+  },
+  "total_recommendations": 3,
+  "approaching_count": 0,
+  "accumulating_count": 3,
+  "buy_count": 0,
+  "wait_count": 0
+}
