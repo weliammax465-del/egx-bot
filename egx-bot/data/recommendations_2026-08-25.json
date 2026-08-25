@@ -1,0 +1,45 @@
+{
+  "report_date": "2026-08-25",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "APSW",
+      "score": 70,
+      "price": 8.7,
+      "type": "APPROACHING",
+      "distance_pct": 0.59,
+      "ema_value": 8.75,
+      "consolidation_pct": 11.26,
+      "volume_trend": "rising",
+      "rsi": 46.8,
+      "adx": 15.5,
+      "higher_lows": false,
+      "stop_loss": 8.26,
+      "target": 9.19
+    },
+    {
+      "ticker": "ELNA",
+      "score": 45,
+      "price": 36.66,
+      "type": "ACCUMULATING",
+      "distance_pct": 3.47,
+      "ema_value": 37.98,
+      "consolidation_pct": 8.57,
+      "volume_trend": "flat",
+      "rsi": 43.5,
+      "adx": 20.4,
+      "higher_lows": false,
+      "stop_loss": 0,
+      "target": 0
+    }
+  ],
+  "current_prices": {
+    "APSW": 8.7,
+    "ELNA": 36.66
+  },
+  "total_recommendations": 2,
+  "approaching_count": 1,
+  "accumulating_count": 1,
+  "buy_count": 0,
+  "wait_count": 0
+}
