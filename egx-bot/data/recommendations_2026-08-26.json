@@ -1,0 +1,29 @@
+{
+  "report_date": "2026-08-26",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "SNFC",
+      "score": 48,
+      "price": 10.49,
+      "type": "ACCUMULATING",
+      "distance_pct": 6.73,
+      "ema_value": 11.25,
+      "consolidation_pct": 8.58,
+      "volume_trend": "flat",
+      "rsi": 31.5,
+      "adx": 22.9,
+      "higher_lows": true,
+      "stop_loss": 0,
+      "target": 0
+    }
+  ],
+  "current_prices": {
+    "SNFC": 10.49
+  },
+  "total_recommendations": 1,
+  "approaching_count": 0,
+  "accumulating_count": 1,
+  "buy_count": 0,
+  "wait_count": 0
+}
