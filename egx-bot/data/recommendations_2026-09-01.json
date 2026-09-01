@@ -1,0 +1,29 @@
+{
+  "report_date": "2026-09-01",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "ELWA",
+      "score": 70,
+      "price": 1.84,
+      "type": "APPROACHING",
+      "distance_pct": 0.26,
+      "ema_value": 1.84,
+      "consolidation_pct": 20.11,
+      "volume_trend": "rising",
+      "rsi": 51.1,
+      "adx": 24.8,
+      "higher_lows": true,
+      "stop_loss": 1.57,
+      "target": 2.11
+    }
+  ],
+  "current_prices": {
+    "ELWA": 1.84
+  },
+  "total_recommendations": 1,
+  "approaching_count": 1,
+  "accumulating_count": 0,
+  "buy_count": 0,
+  "wait_count": 0
+}
