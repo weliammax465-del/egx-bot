@@ -1,0 +1,29 @@
+{
+  "report_date": "2026-09-06",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "EOSB",
+      "score": 70,
+      "price": 1.56,
+      "type": "APPROACHING",
+      "distance_pct": 0.77,
+      "ema_value": 1.57,
+      "consolidation_pct": 8.97,
+      "volume_trend": "rising",
+      "rsi": 40.7,
+      "adx": 42.2,
+      "higher_lows": true,
+      "stop_loss": 1.46,
+      "target": 1.67
+    }
+  ],
+  "current_prices": {
+    "EOSB": 1.56
+  },
+  "total_recommendations": 1,
+  "approaching_count": 1,
+  "accumulating_count": 0,
+  "buy_count": 0,
+  "wait_count": 0
+}
