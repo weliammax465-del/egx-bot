@@ -1,0 +1,29 @@
+{
+  "report_date": "2026-09-13",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "ELKA",
+      "score": 63,
+      "price": 1.72,
+      "type": "ACCUMULATING",
+      "distance_pct": -0.43,
+      "ema_value": 1.71,
+      "consolidation_pct": 16.86,
+      "volume_trend": "flat",
+      "rsi": 43.5,
+      "adx": 28.9,
+      "higher_lows": true,
+      "stop_loss": 0,
+      "target": 0
+    }
+  ],
+  "current_prices": {
+    "ELKA": 1.72
+  },
+  "total_recommendations": 1,
+  "approaching_count": 0,
+  "accumulating_count": 1,
+  "buy_count": 0,
+  "wait_count": 0
+}
