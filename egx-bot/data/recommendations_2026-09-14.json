@@ -1,0 +1,93 @@
+{
+  "report_date": "2026-09-14",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "VALU",
+      "score": 65,
+      "price": 10.59,
+      "type": "ACCUMULATING",
+      "distance_pct": 6.85,
+      "ema_value": 11.37,
+      "consolidation_pct": 9.92,
+      "volume_trend": "rising",
+      "rsi": 33.5,
+      "adx": 30.6,
+      "higher_lows": true,
+      "stop_loss": 0,
+      "target": 0
+    },
+    {
+      "ticker": "ELKA",
+      "score": 45,
+      "price": 1.71,
+      "type": "ACCUMULATING",
+      "distance_pct": 0.14,
+      "ema_value": 1.71,
+      "consolidation_pct": 16.96,
+      "volume_trend": "falling",
+      "rsi": 42.6,
+      "adx": 26.9,
+      "higher_lows": true,
+      "stop_loss": 0,
+      "target": 0
+    },
+    {
+      "ticker": "ASCM",
+      "score": 53,
+      "price": 60.93,
+      "type": "ACCUMULATING",
+      "distance_pct": 1.69,
+      "ema_value": 61.98,
+      "consolidation_pct": 9.65,
+      "volume_trend": "flat",
+      "rsi": 38.0,
+      "adx": 28.0,
+      "higher_lows": true,
+      "stop_loss": 0,
+      "target": 0
+    },
+    {
+      "ticker": "FERC",
+      "score": 68,
+      "price": 78.11,
+      "type": "ACCUMULATING",
+      "distance_pct": 0.69,
+      "ema_value": 78.65,
+      "consolidation_pct": 11.91,
+      "volume_trend": "flat",
+      "rsi": 46.3,
+      "adx": 35.9,
+      "higher_lows": false,
+      "stop_loss": 0,
+      "target": 0
+    },
+    {
+      "ticker": "MCQE",
+      "score": 45,
+      "price": 217.73,
+      "type": "ACCUMULATING",
+      "distance_pct": -0.41,
+      "ema_value": 216.84,
+      "consolidation_pct": 19.74,
+      "volume_trend": "falling",
+      "rsi": 43.5,
+      "adx": 35.9,
+      "higher_lows": false,
+      "stop_loss": 0,
+      "target": 0
+    }
+  ],
+  "current_prices": {
+    "VALU": 10.59,
+    "ELKA": 1.71,
+    "ASCM": 60.93,
+    "FERC": 78.11,
+    "MCQE": 217.73
+  },
+  "total_recommendations": 5,
+  "approaching_count": 0,
+  "accumulating_count": 5,
+  "buy_count": 0,
+  "wait_count": 0
+}
