@@ -1,0 +1,45 @@
+{
+  "report_date": "2026-09-15",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "VALU",
+      "score": 55,
+      "price": 10.51,
+      "type": "ACCUMULATING",
+      "distance_pct": 7.28,
+      "ema_value": 11.34,
+      "consolidation_pct": 11.23,
+      "volume_trend": "rising",
+      "rsi": 32.0,
+      "adx": 32.5,
+      "higher_lows": true,
+      "stop_loss": 0,
+      "target": 0
+    },
+    {
+      "ticker": "FERC",
+      "score": 63,
+      "price": 77.79,
+      "type": "ACCUMULATING",
+      "distance_pct": 1.05,
+      "ema_value": 78.62,
+      "consolidation_pct": 11.96,
+      "volume_trend": "flat",
+      "rsi": 45.2,
+      "adx": 35.2,
+      "higher_lows": false,
+      "stop_loss": 0,
+      "target": 0
+    }
+  ],
+  "current_prices": {
+    "VALU": 10.51,
+    "FERC": 77.79
+  },
+  "total_recommendations": 2,
+  "approaching_count": 0,
+  "accumulating_count": 2,
+  "buy_count": 0,
+  "wait_count": 0
+}
