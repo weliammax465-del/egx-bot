@@ -1,0 +1,45 @@
+{
+  "report_date": "2026-09-17",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "EFIC",
+      "score": 47,
+      "price": 193.7,
+      "type": "ACCUMULATING",
+      "distance_pct": 4.62,
+      "ema_value": 203.08,
+      "consolidation_pct": 23.88,
+      "volume_trend": "rising",
+      "rsi": 43.0,
+      "adx": 33.8,
+      "higher_lows": false,
+      "stop_loss": 0,
+      "target": 0
+    },
+    {
+      "ticker": "SCTS",
+      "score": 48,
+      "price": 609.99,
+      "type": "ACCUMULATING",
+      "distance_pct": -0.12,
+      "ema_value": 609.23,
+      "consolidation_pct": 12.02,
+      "volume_trend": "flat",
+      "rsi": 45.6,
+      "adx": 40.8,
+      "higher_lows": false,
+      "stop_loss": 0,
+      "target": 0
+    }
+  ],
+  "current_prices": {
+    "EFIC": 193.7,
+    "SCTS": 609.99
+  },
+  "total_recommendations": 2,
+  "approaching_count": 0,
+  "accumulating_count": 2,
+  "buy_count": 0,
+  "wait_count": 0
+}
