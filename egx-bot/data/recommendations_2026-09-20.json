@@ -1,0 +1,45 @@
+{
+  "report_date": "2026-09-20",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "EFIC",
+      "score": 47,
+      "price": 193.01,
+      "type": "ACCUMULATING",
+      "distance_pct": 4.77,
+      "ema_value": 202.69,
+      "consolidation_pct": 23.96,
+      "volume_trend": "rising",
+      "rsi": 42.5,
+      "adx": 33.0,
+      "higher_lows": false,
+      "stop_loss": 0,
+      "target": 0
+    },
+    {
+      "ticker": "IFAP",
+      "score": 53,
+      "price": 20.56,
+      "type": "ACCUMULATING",
+      "distance_pct": 0.04,
+      "ema_value": 20.57,
+      "consolidation_pct": 15.32,
+      "volume_trend": "flat",
+      "rsi": 46.9,
+      "adx": 26.4,
+      "higher_lows": false,
+      "stop_loss": 0,
+      "target": 0
+    }
+  ],
+  "current_prices": {
+    "EFIC": 193.01,
+    "IFAP": 20.56
+  },
+  "total_recommendations": 2,
+  "approaching_count": 0,
+  "accumulating_count": 2,
+  "buy_count": 0,
+  "wait_count": 0
+}
