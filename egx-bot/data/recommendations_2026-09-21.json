@@ -1,0 +1,29 @@
+{
+  "report_date": "2026-09-21",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "CERA",
+      "score": 65,
+      "price": 1.37,
+      "type": "ACCUMULATING",
+      "distance_pct": 1.39,
+      "ema_value": 1.39,
+      "consolidation_pct": 62.77,
+      "volume_trend": "rising",
+      "rsi": 45.1,
+      "adx": 26.7,
+      "higher_lows": true,
+      "stop_loss": 0,
+      "target": 0
+    }
+  ],
+  "current_prices": {
+    "CERA": 1.37
+  },
+  "total_recommendations": 1,
+  "approaching_count": 0,
+  "accumulating_count": 1,
+  "buy_count": 0,
+  "wait_count": 0
+}
