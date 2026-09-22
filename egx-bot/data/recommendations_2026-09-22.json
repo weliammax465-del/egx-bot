@@ -1,0 +1,61 @@
+{
+  "report_date": "2026-09-22",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "UNIT",
+      "score": 55,
+      "price": 18.13,
+      "type": "ACCUMULATING",
+      "distance_pct": 0.27,
+      "ema_value": 18.18,
+      "consolidation_pct": 37.67,
+      "volume_trend": "rising",
+      "rsi": 45.2,
+      "adx": 40.4,
+      "higher_lows": false,
+      "stop_loss": 0,
+      "target": 0
+    },
+    {
+      "ticker": "FERC",
+      "score": 55,
+      "price": 78.22,
+      "type": "ACCUMULATING",
+      "distance_pct": 0.75,
+      "ema_value": 78.81,
+      "consolidation_pct": 11.12,
+      "volume_trend": "falling",
+      "rsi": 46.8,
+      "adx": 34.7,
+      "higher_lows": true,
+      "stop_loss": 0,
+      "target": 0
+    },
+    {
+      "ticker": "ACAP",
+      "score": 52,
+      "price": 8.64,
+      "type": "ACCUMULATING",
+      "distance_pct": 3.06,
+      "ema_value": 8.91,
+      "consolidation_pct": 17.25,
+      "volume_trend": "rising",
+      "rsi": 39.5,
+      "adx": 42.0,
+      "higher_lows": true,
+      "stop_loss": 0,
+      "target": 0
+    }
+  ],
+  "current_prices": {
+    "UNIT": 18.13,
+    "FERC": 78.22,
+    "ACAP": 8.64
+  },
+  "total_recommendations": 3,
+  "approaching_count": 0,
+  "accumulating_count": 3,
+  "buy_count": 0,
+  "wait_count": 0
+}
