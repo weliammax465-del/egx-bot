@@ -1,0 +1,61 @@
+{
+  "report_date": "2026-09-23",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "UNIT",
+      "score": 55,
+      "price": 18.02,
+      "type": "ACCUMULATING",
+      "distance_pct": 0.85,
+      "ema_value": 18.17,
+      "consolidation_pct": 37.9,
+      "volume_trend": "rising",
+      "rsi": 44.5,
+      "adx": 39.0,
+      "higher_lows": false,
+      "stop_loss": 0,
+      "target": 0
+    },
+    {
+      "ticker": "EPCO",
+      "score": 45,
+      "price": 10.63,
+      "type": "ACCUMULATING",
+      "distance_pct": 2.74,
+      "ema_value": 10.93,
+      "consolidation_pct": 18.72,
+      "volume_trend": "rising",
+      "rsi": 42.0,
+      "adx": 30.0,
+      "higher_lows": false,
+      "stop_loss": 0,
+      "target": 0
+    },
+    {
+      "ticker": "COMI",
+      "score": 45,
+      "price": 128.1,
+      "type": "ACCUMULATING",
+      "distance_pct": 6.0,
+      "ema_value": 136.28,
+      "consolidation_pct": 11.48,
+      "volume_trend": "rising",
+      "rsi": 29.7,
+      "adx": 23.3,
+      "higher_lows": false,
+      "stop_loss": 0,
+      "target": 0
+    }
+  ],
+  "current_prices": {
+    "UNIT": 18.02,
+    "EPCO": 10.63,
+    "COMI": 128.1
+  },
+  "total_recommendations": 3,
+  "approaching_count": 0,
+  "accumulating_count": 3,
+  "buy_count": 0,
+  "wait_count": 0
+}
