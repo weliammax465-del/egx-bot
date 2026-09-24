@@ -1,0 +1,45 @@
+{
+  "report_date": "2026-09-24",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "UNIT",
+      "score": 45,
+      "price": 17.79,
+      "type": "ACCUMULATING",
+      "distance_pct": 2.04,
+      "ema_value": 18.16,
+      "consolidation_pct": 40.98,
+      "volume_trend": "rising",
+      "rsi": 43.0,
+      "adx": 36.7,
+      "higher_lows": false,
+      "stop_loss": 0,
+      "target": 0
+    },
+    {
+      "ticker": "EASB",
+      "score": 50,
+      "price": 7.49,
+      "type": "ACCUMULATING",
+      "distance_pct": 0.44,
+      "ema_value": 7.52,
+      "consolidation_pct": 37.65,
+      "volume_trend": "falling",
+      "rsi": 45.1,
+      "adx": 32.2,
+      "higher_lows": true,
+      "stop_loss": 0,
+      "target": 0
+    }
+  ],
+  "current_prices": {
+    "UNIT": 17.79,
+    "EASB": 7.49
+  },
+  "total_recommendations": 2,
+  "approaching_count": 0,
+  "accumulating_count": 2,
+  "buy_count": 0,
+  "wait_count": 0
+}
