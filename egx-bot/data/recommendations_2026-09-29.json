@@ -1,0 +1,29 @@
+{
+  "report_date": "2026-09-29",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "NARE",
+      "score": 53,
+      "price": 16.66,
+      "type": "ACCUMULATING",
+      "distance_pct": 0.77,
+      "ema_value": 16.79,
+      "consolidation_pct": 27.19,
+      "volume_trend": "flat",
+      "rsi": 40.9,
+      "adx": 29.9,
+      "higher_lows": false,
+      "stop_loss": 0,
+      "target": 0
+    }
+  ],
+  "current_prices": {
+    "NARE": 16.66
+  },
+  "total_recommendations": 1,
+  "approaching_count": 0,
+  "accumulating_count": 1,
+  "buy_count": 0,
+  "wait_count": 0
+}
