@@ -1,0 +1,29 @@
+{
+  "report_date": "2026-09-30",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "OIH",
+      "score": 45,
+      "price": 1.84,
+      "type": "ACCUMULATING",
+      "distance_pct": 2.86,
+      "ema_value": 1.89,
+      "consolidation_pct": 26.63,
+      "volume_trend": "rising",
+      "rsi": 36.0,
+      "adx": 60.4,
+      "higher_lows": false,
+      "stop_loss": 0,
+      "target": 0
+    }
+  ],
+  "current_prices": {
+    "OIH": 1.84
+  },
+  "total_recommendations": 1,
+  "approaching_count": 0,
+  "accumulating_count": 1,
+  "buy_count": 0,
+  "wait_count": 0
+}
