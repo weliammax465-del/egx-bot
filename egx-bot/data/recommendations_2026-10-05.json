@@ -1,0 +1,45 @@
+{
+  "report_date": "2026-10-05",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "POUL",
+      "score": 50,
+      "price": 10.09,
+      "type": "ACCUMULATING",
+      "distance_pct": 2.13,
+      "ema_value": 10.31,
+      "consolidation_pct": 32.8,
+      "volume_trend": "rising",
+      "rsi": 45.8,
+      "adx": 28.5,
+      "higher_lows": false,
+      "stop_loss": 0,
+      "target": 0
+    },
+    {
+      "ticker": "MPRC",
+      "score": 55,
+      "price": 40.5,
+      "type": "ACCUMULATING",
+      "distance_pct": -0.18,
+      "ema_value": 40.43,
+      "consolidation_pct": 11.98,
+      "volume_trend": "falling",
+      "rsi": 52.2,
+      "adx": 15.7,
+      "higher_lows": false,
+      "stop_loss": 0,
+      "target": 0
+    }
+  ],
+  "current_prices": {
+    "POUL": 10.09,
+    "MPRC": 40.5
+  },
+  "total_recommendations": 2,
+  "approaching_count": 0,
+  "accumulating_count": 2,
+  "buy_count": 0,
+  "wait_count": 0
+}
