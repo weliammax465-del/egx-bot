@@ -1,0 +1,29 @@
+{
+  "report_date": "2026-10-07",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "OLFI",
+      "score": 45,
+      "price": 21.09,
+      "type": "ACCUMULATING",
+      "distance_pct": 6.6,
+      "ema_value": 22.58,
+      "consolidation_pct": 11.52,
+      "volume_trend": "rising",
+      "rsi": 32.3,
+      "adx": 30.1,
+      "higher_lows": false,
+      "stop_loss": 0,
+      "target": 0
+    }
+  ],
+  "current_prices": {
+    "OLFI": 21.09
+  },
+  "total_recommendations": 1,
+  "approaching_count": 0,
+  "accumulating_count": 1,
+  "buy_count": 0,
+  "wait_count": 0
+}
