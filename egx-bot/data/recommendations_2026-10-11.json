@@ -1,0 +1,61 @@
+{
+  "report_date": "2026-10-11",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "OLFI",
+      "score": 45,
+      "price": 21.11,
+      "type": "ACCUMULATING",
+      "distance_pct": 6.27,
+      "ema_value": 22.52,
+      "consolidation_pct": 11.51,
+      "volume_trend": "rising",
+      "rsi": 32.7,
+      "adx": 31.2,
+      "higher_lows": false,
+      "stop_loss": 0,
+      "target": 0
+    },
+    {
+      "ticker": "GBCO",
+      "score": 65,
+      "price": 30.42,
+      "type": "ACCUMULATING",
+      "distance_pct": 0.02,
+      "ema_value": 30.43,
+      "consolidation_pct": 19.63,
+      "volume_trend": "rising",
+      "rsi": 48.6,
+      "adx": 17.5,
+      "higher_lows": false,
+      "stop_loss": 0,
+      "target": 0
+    },
+    {
+      "ticker": "SMFR",
+      "score": 48,
+      "price": 233.49,
+      "type": "ACCUMULATING",
+      "distance_pct": 0.84,
+      "ema_value": 235.46,
+      "consolidation_pct": 21.41,
+      "volume_trend": "flat",
+      "rsi": 49.7,
+      "adx": 24.8,
+      "higher_lows": true,
+      "stop_loss": 0,
+      "target": 0
+    }
+  ],
+  "current_prices": {
+    "OLFI": 21.11,
+    "GBCO": 30.42,
+    "SMFR": 233.49
+  },
+  "total_recommendations": 3,
+  "approaching_count": 0,
+  "accumulating_count": 3,
+  "buy_count": 0,
+  "wait_count": 0
+}
