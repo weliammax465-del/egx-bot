@@ -1,0 +1,29 @@
+{
+  "report_date": "2026-10-12",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "APSW",
+      "score": 52,
+      "price": 8.1,
+      "type": "ACCUMULATING",
+      "distance_pct": 4.38,
+      "ema_value": 8.47,
+      "consolidation_pct": 13.7,
+      "volume_trend": "rising",
+      "rsi": 41.0,
+      "adx": 23.9,
+      "higher_lows": false,
+      "stop_loss": 0,
+      "target": 0
+    }
+  ],
+  "current_prices": {
+    "APSW": 8.1
+  },
+  "total_recommendations": 1,
+  "approaching_count": 0,
+  "accumulating_count": 1,
+  "buy_count": 0,
+  "wait_count": 0
+}
