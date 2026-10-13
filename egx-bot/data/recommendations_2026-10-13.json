@@ -1,0 +1,45 @@
+{
+  "report_date": "2026-10-13",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "APSW",
+      "score": 55,
+      "price": 8.0,
+      "type": "ACCUMULATING",
+      "distance_pct": 5.35,
+      "ema_value": 8.45,
+      "consolidation_pct": 13.88,
+      "volume_trend": "rising",
+      "rsi": 38.5,
+      "adx": 23.5,
+      "higher_lows": false,
+      "stop_loss": 0,
+      "target": 0
+    },
+    {
+      "ticker": "PHDC",
+      "score": 48,
+      "price": 12.79,
+      "type": "ACCUMULATING",
+      "distance_pct": 7.49,
+      "ema_value": 13.83,
+      "consolidation_pct": 12.9,
+      "volume_trend": "flat",
+      "rsi": 34.0,
+      "adx": 38.2,
+      "higher_lows": true,
+      "stop_loss": 0,
+      "target": 0
+    }
+  ],
+  "current_prices": {
+    "APSW": 8.0,
+    "PHDC": 12.79
+  },
+  "total_recommendations": 2,
+  "approaching_count": 0,
+  "accumulating_count": 2,
+  "buy_count": 0,
+  "wait_count": 0
+}
