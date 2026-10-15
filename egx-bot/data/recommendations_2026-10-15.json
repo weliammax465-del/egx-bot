@@ -1,0 +1,61 @@
+{
+  "report_date": "2026-10-15",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "ARCC",
+      "score": 60,
+      "price": 66.92,
+      "type": "ACCUMULATING",
+      "distance_pct": 2.23,
+      "ema_value": 68.45,
+      "consolidation_pct": 21.28,
+      "volume_trend": "rising",
+      "rsi": 44.7,
+      "adx": 25.3,
+      "higher_lows": true,
+      "stop_loss": 0,
+      "target": 0
+    },
+    {
+      "ticker": "MBSC",
+      "score": 70,
+      "price": 346.0,
+      "type": "APPROACHING",
+      "distance_pct": -0.22,
+      "ema_value": 345.23,
+      "consolidation_pct": 36.7,
+      "volume_trend": "rising",
+      "rsi": 48.3,
+      "adx": 23.9,
+      "higher_lows": true,
+      "stop_loss": 274.82,
+      "target": 416.41
+    },
+    {
+      "ticker": "BONY",
+      "score": 62,
+      "price": 4.18,
+      "type": "ACCUMULATING",
+      "distance_pct": 3.64,
+      "ema_value": 4.34,
+      "consolidation_pct": 18.42,
+      "volume_trend": "rising",
+      "rsi": 46.1,
+      "adx": 21.1,
+      "higher_lows": true,
+      "stop_loss": 0,
+      "target": 0
+    }
+  ],
+  "current_prices": {
+    "ARCC": 66.92,
+    "MBSC": 346.0,
+    "BONY": 4.18
+  },
+  "total_recommendations": 3,
+  "approaching_count": 1,
+  "accumulating_count": 2,
+  "buy_count": 0,
+  "wait_count": 0
+}
