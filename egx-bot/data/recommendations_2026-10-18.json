@@ -1,0 +1,93 @@
+{
+  "report_date": "2026-10-18",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "ARCC",
+      "score": 52,
+      "price": 65.39,
+      "type": "ACCUMULATING",
+      "distance_pct": 4.31,
+      "ema_value": 68.33,
+      "consolidation_pct": 21.78,
+      "volume_trend": "rising",
+      "rsi": 41.8,
+      "adx": 24.0,
+      "higher_lows": true,
+      "stop_loss": 0,
+      "target": 0
+    },
+    {
+      "ticker": "MBSC",
+      "score": 52,
+      "price": 333.17,
+      "type": "ACCUMULATING",
+      "distance_pct": 3.36,
+      "ema_value": 344.77,
+      "consolidation_pct": 38.12,
+      "volume_trend": "rising",
+      "rsi": 45.3,
+      "adx": 23.7,
+      "higher_lows": true,
+      "stop_loss": 0,
+      "target": 0
+    },
+    {
+      "ticker": "APSW",
+      "score": 55,
+      "price": 7.97,
+      "type": "ACCUMULATING",
+      "distance_pct": 5.14,
+      "ema_value": 8.4,
+      "consolidation_pct": 13.93,
+      "volume_trend": "rising",
+      "rsi": 40.4,
+      "adx": 21.8,
+      "higher_lows": true,
+      "stop_loss": 0,
+      "target": 0
+    },
+    {
+      "ticker": "ETRS",
+      "score": 50,
+      "price": 10.1,
+      "type": "ACCUMULATING",
+      "distance_pct": 5.06,
+      "ema_value": 10.64,
+      "consolidation_pct": 15.05,
+      "volume_trend": "rising",
+      "rsi": 40.7,
+      "adx": 22.1,
+      "higher_lows": true,
+      "stop_loss": 0,
+      "target": 0
+    },
+    {
+      "ticker": "TWSA",
+      "score": 45,
+      "price": 6.52,
+      "type": "ACCUMULATING",
+      "distance_pct": 7.94,
+      "ema_value": 7.08,
+      "consolidation_pct": 58.9,
+      "volume_trend": "rising",
+      "rsi": 41.7,
+      "adx": 27.2,
+      "higher_lows": false,
+      "stop_loss": 0,
+      "target": 0
+    }
+  ],
+  "current_prices": {
+    "ARCC": 65.39,
+    "MBSC": 333.17,
+    "APSW": 7.97,
+    "ETRS": 10.1,
+    "TWSA": 6.52
+  },
+  "total_recommendations": 5,
+  "approaching_count": 0,
+  "accumulating_count": 5,
+  "buy_count": 0,
+  "wait_count": 0
+}
