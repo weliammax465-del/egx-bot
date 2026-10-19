@@ -1,0 +1,45 @@
+{
+  "report_date": "2026-10-19",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "FWRY",
+      "score": 80,
+      "price": 18.32,
+      "type": "APPROACHING",
+      "distance_pct": 2.74,
+      "ema_value": 18.84,
+      "consolidation_pct": 10.15,
+      "volume_trend": "rising",
+      "rsi": 42.3,
+      "adx": 23.5,
+      "higher_lows": true,
+      "stop_loss": 17.22,
+      "target": 19.93
+    },
+    {
+      "ticker": "MBSC",
+      "score": 60,
+      "price": 334.83,
+      "type": "ACCUMULATING",
+      "distance_pct": 2.77,
+      "ema_value": 344.37,
+      "consolidation_pct": 37.93,
+      "volume_trend": "rising",
+      "rsi": 45.7,
+      "adx": 22.9,
+      "higher_lows": true,
+      "stop_loss": 0,
+      "target": 0
+    }
+  ],
+  "current_prices": {
+    "FWRY": 18.32,
+    "MBSC": 334.83
+  },
+  "total_recommendations": 2,
+  "approaching_count": 1,
+  "accumulating_count": 1,
+  "buy_count": 0,
+  "wait_count": 0
+}
