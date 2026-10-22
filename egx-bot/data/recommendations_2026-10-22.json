@@ -1,0 +1,61 @@
+{
+  "report_date": "2026-10-22",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "POUL",
+      "score": 52,
+      "price": 9.66,
+      "type": "ACCUMULATING",
+      "distance_pct": 4.65,
+      "ema_value": 10.13,
+      "consolidation_pct": 34.27,
+      "volume_trend": "rising",
+      "rsi": 42.7,
+      "adx": 30.9,
+      "higher_lows": true,
+      "stop_loss": 0,
+      "target": 0
+    },
+    {
+      "ticker": "EAST",
+      "score": 50,
+      "price": 30.48,
+      "type": "ACCUMULATING",
+      "distance_pct": 4.15,
+      "ema_value": 31.8,
+      "consolidation_pct": 16.86,
+      "volume_trend": "flat",
+      "rsi": 52.2,
+      "adx": 45.7,
+      "higher_lows": true,
+      "stop_loss": 0,
+      "target": 0
+    },
+    {
+      "ticker": "ARCC",
+      "score": 47,
+      "price": 65.11,
+      "type": "ACCUMULATING",
+      "distance_pct": 4.24,
+      "ema_value": 67.99,
+      "consolidation_pct": 21.87,
+      "volume_trend": "rising",
+      "rsi": 42.1,
+      "adx": 20.9,
+      "higher_lows": false,
+      "stop_loss": 0,
+      "target": 0
+    }
+  ],
+  "current_prices": {
+    "POUL": 9.66,
+    "EAST": 30.48,
+    "ARCC": 65.11
+  },
+  "total_recommendations": 3,
+  "approaching_count": 0,
+  "accumulating_count": 3,
+  "buy_count": 0,
+  "wait_count": 0
+}
