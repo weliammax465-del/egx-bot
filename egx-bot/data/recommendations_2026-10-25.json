@@ -1,0 +1,45 @@
+{
+  "report_date": "2026-10-25",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "TMGH",
+      "score": 45,
+      "price": 82.0,
+      "type": "ACCUMULATING",
+      "distance_pct": 9.61,
+      "ema_value": 90.71,
+      "consolidation_pct": 15.84,
+      "volume_trend": "rising",
+      "rsi": 36.9,
+      "adx": 43.6,
+      "higher_lows": false,
+      "stop_loss": 0,
+      "target": 0
+    },
+    {
+      "ticker": "ELWA",
+      "score": 50,
+      "price": 1.65,
+      "type": "ACCUMULATING",
+      "distance_pct": 1.0,
+      "ema_value": 1.67,
+      "consolidation_pct": 14.55,
+      "volume_trend": "falling",
+      "rsi": 55.4,
+      "adx": 17.6,
+      "higher_lows": false,
+      "stop_loss": 0,
+      "target": 0
+    }
+  ],
+  "current_prices": {
+    "TMGH": 82.0,
+    "ELWA": 1.65
+  },
+  "total_recommendations": 2,
+  "approaching_count": 0,
+  "accumulating_count": 2,
+  "buy_count": 0,
+  "wait_count": 0
+}
