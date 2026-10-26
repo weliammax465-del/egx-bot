@@ -1,0 +1,45 @@
+{
+  "report_date": "2026-10-26",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "TMGH",
+      "score": 45,
+      "price": 81.6,
+      "type": "ACCUMULATING",
+      "distance_pct": 9.7,
+      "ema_value": 90.37,
+      "consolidation_pct": 15.92,
+      "volume_trend": "rising",
+      "rsi": 36.2,
+      "adx": 41.7,
+      "higher_lows": false,
+      "stop_loss": 0,
+      "target": 0
+    },
+    {
+      "ticker": "COMI",
+      "score": 60,
+      "price": 120.1,
+      "type": "ACCUMULATING",
+      "distance_pct": 7.33,
+      "ema_value": 129.6,
+      "consolidation_pct": 9.94,
+      "volume_trend": "rising",
+      "rsi": 33.4,
+      "adx": 43.2,
+      "higher_lows": false,
+      "stop_loss": 0,
+      "target": 0
+    }
+  ],
+  "current_prices": {
+    "TMGH": 81.6,
+    "COMI": 120.1
+  },
+  "total_recommendations": 2,
+  "approaching_count": 0,
+  "accumulating_count": 2,
+  "buy_count": 0,
+  "wait_count": 0
+}
