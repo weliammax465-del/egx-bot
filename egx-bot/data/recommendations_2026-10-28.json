@@ -1,0 +1,29 @@
+{
+  "report_date": "2026-10-28",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "EAST",
+      "score": 58,
+      "price": 31.8,
+      "type": "ACCUMULATING",
+      "distance_pct": -0.39,
+      "ema_value": 31.67,
+      "consolidation_pct": 16.01,
+      "volume_trend": "flat",
+      "rsi": 59.8,
+      "adx": 36.6,
+      "higher_lows": true,
+      "stop_loss": 0,
+      "target": 0
+    }
+  ],
+  "current_prices": {
+    "EAST": 31.8
+  },
+  "total_recommendations": 1,
+  "approaching_count": 0,
+  "accumulating_count": 1,
+  "buy_count": 0,
+  "wait_count": 0
+}
