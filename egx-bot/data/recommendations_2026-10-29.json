@@ -1,0 +1,45 @@
+{
+  "report_date": "2026-10-29",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "MPCI",
+      "score": 55,
+      "price": 326.0,
+      "type": "ACCUMULATING",
+      "distance_pct": 1.84,
+      "ema_value": 332.13,
+      "consolidation_pct": 40.15,
+      "volume_trend": "rising",
+      "rsi": 51.4,
+      "adx": 29.6,
+      "higher_lows": false,
+      "stop_loss": 0,
+      "target": 0
+    },
+    {
+      "ticker": "TMGH",
+      "score": 45,
+      "price": 80.4,
+      "type": "ACCUMULATING",
+      "distance_pct": 9.97,
+      "ema_value": 89.3,
+      "consolidation_pct": 16.92,
+      "volume_trend": "rising",
+      "rsi": 35.7,
+      "adx": 37.6,
+      "higher_lows": false,
+      "stop_loss": 0,
+      "target": 0
+    }
+  ],
+  "current_prices": {
+    "MPCI": 326.0,
+    "TMGH": 80.4
+  },
+  "total_recommendations": 2,
+  "approaching_count": 0,
+  "accumulating_count": 2,
+  "buy_count": 0,
+  "wait_count": 0
+}
