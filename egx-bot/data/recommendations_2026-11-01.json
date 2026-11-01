@@ -1,0 +1,29 @@
+{
+  "report_date": "2026-11-01",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "MFPC",
+      "score": 65,
+      "price": 44.0,
+      "type": "ACCUMULATING",
+      "distance_pct": 1.23,
+      "ema_value": 44.55,
+      "consolidation_pct": 16.59,
+      "volume_trend": "rising",
+      "rsi": 46.0,
+      "adx": 21.3,
+      "higher_lows": true,
+      "stop_loss": 0,
+      "target": 0
+    }
+  ],
+  "current_prices": {
+    "MFPC": 44.0
+  },
+  "total_recommendations": 1,
+  "approaching_count": 0,
+  "accumulating_count": 1,
+  "buy_count": 0,
+  "wait_count": 0
+}
