@@ -1,0 +1,45 @@
+{
+  "report_date": "2026-11-02",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "MFPC",
+      "score": 45,
+      "price": 41.3,
+      "type": "ACCUMULATING",
+      "distance_pct": 7.03,
+      "ema_value": 44.42,
+      "consolidation_pct": 17.68,
+      "volume_trend": "rising",
+      "rsi": 39.1,
+      "adx": 22.0,
+      "higher_lows": true,
+      "stop_loss": 0,
+      "target": 0
+    },
+    {
+      "ticker": "ABUK",
+      "score": 45,
+      "price": 80.6,
+      "type": "ACCUMULATING",
+      "distance_pct": 6.85,
+      "ema_value": 86.53,
+      "consolidation_pct": 20.77,
+      "volume_trend": "rising",
+      "rsi": 38.7,
+      "adx": 15.5,
+      "higher_lows": true,
+      "stop_loss": 0,
+      "target": 0
+    }
+  ],
+  "current_prices": {
+    "MFPC": 41.3,
+    "ABUK": 80.6
+  },
+  "total_recommendations": 2,
+  "approaching_count": 0,
+  "accumulating_count": 2,
+  "buy_count": 0,
+  "wait_count": 0
+}
