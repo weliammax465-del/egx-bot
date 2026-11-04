@@ -1,0 +1,77 @@
+{
+  "report_date": "2026-11-04",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "JUFO",
+      "score": 70,
+      "price": 23.95,
+      "type": "APPROACHING",
+      "distance_pct": 2.36,
+      "ema_value": 24.53,
+      "consolidation_pct": 18.66,
+      "volume_trend": "rising",
+      "rsi": 50.2,
+      "adx": 41.6,
+      "higher_lows": true,
+      "stop_loss": 20.49,
+      "target": 27.99
+    },
+    {
+      "ticker": "SCTS",
+      "score": 50,
+      "price": 494.45,
+      "type": "ACCUMULATING",
+      "distance_pct": 7.53,
+      "ema_value": 534.72,
+      "consolidation_pct": 33.98,
+      "volume_trend": "rising",
+      "rsi": 46.5,
+      "adx": 38.6,
+      "higher_lows": true,
+      "stop_loss": 0,
+      "target": 0
+    },
+    {
+      "ticker": "ADCI",
+      "score": 62,
+      "price": 256.43,
+      "type": "ACCUMULATING",
+      "distance_pct": 3.42,
+      "ema_value": 265.5,
+      "consolidation_pct": 23.01,
+      "volume_trend": "rising",
+      "rsi": 46.9,
+      "adx": 27.7,
+      "higher_lows": true,
+      "stop_loss": 0,
+      "target": 0
+    },
+    {
+      "ticker": "TANM",
+      "score": 65,
+      "price": 5.79,
+      "type": "ACCUMULATING",
+      "distance_pct": 1.79,
+      "ema_value": 5.9,
+      "consolidation_pct": 43.7,
+      "volume_trend": "rising",
+      "rsi": 51.4,
+      "adx": 26.1,
+      "higher_lows": true,
+      "stop_loss": 0,
+      "target": 0
+    }
+  ],
+  "current_prices": {
+    "JUFO": 23.95,
+    "SCTS": 494.45,
+    "ADCI": 256.43,
+    "TANM": 5.79
+  },
+  "total_recommendations": 4,
+  "approaching_count": 1,
+  "accumulating_count": 3,
+  "buy_count": 0,
+  "wait_count": 0
+}
