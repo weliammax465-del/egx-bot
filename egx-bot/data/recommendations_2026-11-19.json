@@ -1,0 +1,77 @@
+{
+  "report_date": "2026-11-19",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "DGTZ",
+      "score": 60,
+      "price": 2.07,
+      "type": "ACCUMULATING",
+      "distance_pct": 2.68,
+      "ema_value": 2.13,
+      "consolidation_pct": 41.06,
+      "volume_trend": "rising",
+      "rsi": 51.6,
+      "adx": 38.6,
+      "higher_lows": true,
+      "stop_loss": 0,
+      "target": 0
+    },
+    {
+      "ticker": "SMFR",
+      "score": 75,
+      "price": 216.65,
+      "type": "APPROACHING",
+      "distance_pct": -0.32,
+      "ema_value": 215.95,
+      "consolidation_pct": 45.7,
+      "volume_trend": "rising",
+      "rsi": 52.4,
+      "adx": 32.2,
+      "higher_lows": true,
+      "stop_loss": 157.75,
+      "target": 274.85
+    },
+    {
+      "ticker": "SUGR",
+      "score": 75,
+      "price": 51.99,
+      "type": "APPROACHING",
+      "distance_pct": 0.55,
+      "ema_value": 52.28,
+      "consolidation_pct": 19.23,
+      "volume_trend": "rising",
+      "rsi": 51.7,
+      "adx": 24.7,
+      "higher_lows": true,
+      "stop_loss": 45.14,
+      "target": 59.13
+    },
+    {
+      "ticker": "NCCW",
+      "score": 45,
+      "price": 5.6,
+      "type": "ACCUMULATING",
+      "distance_pct": 5.29,
+      "ema_value": 5.91,
+      "consolidation_pct": 40.89,
+      "volume_trend": "rising",
+      "rsi": 47.0,
+      "adx": 25.8,
+      "higher_lows": true,
+      "stop_loss": 0,
+      "target": 0
+    }
+  ],
+  "current_prices": {
+    "DGTZ": 2.07,
+    "SMFR": 216.65,
+    "SUGR": 51.99,
+    "NCCW": 5.6
+  },
+  "total_recommendations": 4,
+  "approaching_count": 2,
+  "accumulating_count": 2,
+  "buy_count": 0,
+  "wait_count": 0
+}
