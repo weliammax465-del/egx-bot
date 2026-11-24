@@ -1,0 +1,29 @@
+{
+  "report_date": "2026-11-24",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "SMFR",
+      "score": 50,
+      "price": 212.05,
+      "type": "ACCUMULATING",
+      "distance_pct": 1.46,
+      "ema_value": 215.2,
+      "consolidation_pct": 40.56,
+      "volume_trend": "falling",
+      "rsi": 50.0,
+      "adx": 28.8,
+      "higher_lows": true,
+      "stop_loss": 0,
+      "target": 0
+    }
+  ],
+  "current_prices": {
+    "SMFR": 212.05
+  },
+  "total_recommendations": 1,
+  "approaching_count": 0,
+  "accumulating_count": 1,
+  "buy_count": 0,
+  "wait_count": 0
+}
