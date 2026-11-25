@@ -1,0 +1,29 @@
+{
+  "report_date": "2026-11-25",
+  "strategy": "Pre-Breakout Scanner",
+  "recommendations": [
+    {
+      "ticker": "MBSC",
+      "score": 75,
+      "price": 333.45,
+      "type": "APPROACHING",
+      "distance_pct": 0.88,
+      "ema_value": 336.42,
+      "consolidation_pct": 31.61,
+      "volume_trend": "rising",
+      "rsi": 48.4,
+      "adx": 20.2,
+      "higher_lows": false,
+      "stop_loss": 283.46,
+      "target": 386.41
+    }
+  ],
+  "current_prices": {
+    "MBSC": 333.45
+  },
+  "total_recommendations": 1,
+  "approaching_count": 1,
+  "accumulating_count": 0,
+  "buy_count": 0,
+  "wait_count": 0
+}
